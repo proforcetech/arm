@@ -1,0 +1,19 @@
+.arm-re-form { max-width: 880px; margin: 1.5rem auto; }
+.arm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.arm-row { margin: 12px 0; }
+.arm-row label { margin-right: 12px; }
+.arm-fieldset { border: 1px solid #ddd; padding: 12px; border-radius: 6px; }
+.arm-actions { margin-top: 16px; }
+.arm-btn { background: #2271b1; color: #fff; border: 0; padding: 10px 16px; border-radius: 4px; cursor: pointer; }
+.arm-btn:hover { background: #135e96; }
+.arm-terms-wrap { margin-top: 12px; }
+.arm-terms-content { max-height: 220px; overflow: auto; padding: 10px; border: 1px solid #ddd; border-radius: 6px; background: #fafafa; }
+.arm-terms-accept { display: block; margin-top: 10px; }
+.arm-msg { margin-top: 12px; padding: 10px; border-radius: 4px; }
+.arm-ok { background: #e7f7eb; color: #1f7a36; border: 1px solid #b9e0c3; }
+.arm-error { background: #fde8e8; color: #9b1c1c; border: 1px solid #f5c2c2; }
+.arm-sms-consent { margin-top: 6px; color: #555; }

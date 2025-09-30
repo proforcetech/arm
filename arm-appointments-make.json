@@ -1,0 +1,122 @@
+{
+  "name": "ARM Appointments → Google Calendar + Twilio + Reminder",
+  "description": "Handles appointment events, routes SMS by status, and sends reminders 24 hours before.",
+  "modules": [
+    {
+      "id": 1,
+      "name": "ARM Webhook",
+      "type": "hook",
+      "subtype": "customWebhook",
+      "parameters": {
+        "hookName": "arm_appointments"
+      }
+    },
+    {
+      "id": 2,
+      "name": "Router",
+      "type": "router",
+      "parameters": {}
+    },
+    {
+      "id": 3,
+      "name": "Google Calendar - Create Event",
+      "type": "googleCalendar",
+      "subtype": "createEvent",
+      "parameters": {
+        "calendarId": "primary",
+        "summary": "{{customer.name}} — Appointment",
+        "description": "Estimate ID: {{appointment.estimate_id}}\\nNotes: {{appointment.notes}}",
+        "location": "{{customer.address}}",
+        "start": "{{appointment.start_time}}",
+        "end": "{{appointment.end_time}}",
+        "attendees": [
+          {
+            "email": "{{customer.email}}"
+          }
+        ]
+      }
+    },
+    {
+      "id": 4,
+      "name": "Twilio SMS (Created)",
+      "type": "twilio",
+      "subtype": "sendSms",
+      "parameters": {
+        "from": "+15550000000",
+        "to": "{{customer.phone}}",
+        "body": "Hi {{customer.name}}, your appointment is confirmed for {{appointment.start_time}}."
+      }
+    },
+    {
+      "id": 5,
+      "name": "Twilio SMS (Updated)",
+      "type": "twilio",
+      "subtype": "sendSms",
+      "parameters": {
+        "from": "+15550000000",
+        "to": "{{customer.phone}}",
+        "body": "Hi {{customer.name}}, your appointment has been updated to {{appointment.start_time}}."
+      }
+    },
+    {
+      "id": 6,
+      "name": "Twilio SMS (Canceled)",
+      "type": "twilio",
+      "subtype": "sendSms",
+      "parameters": {
+        "from": "+15550000000",
+        "to": "{{customer.phone}}",
+        "body": "Hi {{customer.name}}, your appointment scheduled for {{appointment.start_time}} has been canceled. Please contact us to reschedule."
+      }
+    },
+    {
+      "id": 7,
+      "name": "Scheduler",
+      "type": "tools",
+      "subtype": "sleep",
+      "parameters": {
+        "interval": "60m"
+      }
+    },
+    {
+      "id": 8,
+      "name": "Google Calendar - Search Events (Next 24h)",
+      "type": "googleCalendar",
+      "subtype": "searchEvents",
+      "parameters": {
+        "calendarId": "primary",
+        "timeMin": "{{now}}",
+        "timeMax": "{{addHours(now;24)}}"
+      }
+    },
+    {
+      "id": 9,
+      "name": "Twilio SMS (Reminder)",
+      "type": "twilio",
+      "subtype": "sendSms",
+      "parameters": {
+        "from": "+15550000000",
+        "to": "{{customer.phone}}",
+        "body": "Hi {{customer.name}}, this is a reminder for your appointment on {{appointment.start_time}} with FixItForUs Automotive."
+      }
+    }
+  ],
+  "links": [
+    { "from_module": 1, "to_module": 2 },
+    { "from_module": 2, "to_module": 3 },
+    { "from_module": 2, "to_module": 4, "condition": { "type": "equal", "operand1": "{{type}}", "operand2": "appointment.created" } },
+    { "from_module": 2, "to_module": 5, "condition": { "type": "equal", "operand1": "{{type}}", "operand2": "appointment.updated" } },
+    { "from_module": 2, "to_module": 6, "condition": { "type": "equal", "operand1": "{{type}}", "operand2": "appointment.canceled" } },
+    { "from_module": 7, "to_module": 8 },
+    { "from_module": 8, "to_module": 9 }
+  ],
+  "triggers": [
+    { "moduleId": 1, "type": "instant" },
+    { "moduleId": 7, "type": "scheduled" }
+  ],
+  "metadata": {
+    "version": "1.2",
+    "author": "ARM Repair Estimates",
+    "dateCreated": "2025-09-23"
+  }
+}

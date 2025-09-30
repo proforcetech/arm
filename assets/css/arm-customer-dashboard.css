@@ -1,0 +1,302 @@
+/* === Tabs === */
+.arm-dashboard {
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  margin: 20px 0;
+}
+
+.arm-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.arm-tabs button {
+  background: #f1f1f1;
+  border: 1px solid #ccc;
+  padding: 10px 20px;
+  cursor: pointer;
+  border-radius: 4px 4px 0 0;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.arm-tabs button:hover {
+  background: #e5e5e5;
+}
+
+.arm-tabs button.active {
+  background: #0073aa;
+  color: #fff;
+  border-color: #0073aa;
+}
+
+/* === Tab Content === */
+.arm-tab {
+  display: none;
+  border: 1px solid #ccc;
+  border-top: none;
+  padding: 20px;
+  border-radius: 0 4px 4px 4px;
+  background: #fff;
+}
+
+.arm-tab.active {
+  display: block;
+}
+
+/* === Tables === */
+.arm-tab table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+}
+
+.arm-tab th,
+.arm-tab td {
+  border: 1px solid #ddd;
+  padding: 10px;
+  text-align: left;
+}
+
+.arm-tab th {
+  background: #f9f9f9;
+  font-weight: 600;
+}
+
+.arm-tab tr:nth-child(even) {
+  background: #fdfdfd;
+}
+
+/* === Buttons === */
+.arm-btn,
+.arm-add-vehicle,
+.arm-edit-vehicle,
+.arm-del-vehicle,
+.arm-pay-btn {
+  display: inline-block;
+  padding: 6px 12px;
+  font-size: 14px;
+  border-radius: 3px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.2s;
+}
+
+.arm-btn,
+.arm-add-vehicle,
+.arm-edit-vehicle,
+.arm-pay-btn {
+  background: #0073aa;
+  color: #fff;
+  border: none;
+}
+
+.arm-btn:hover,
+.arm-add-vehicle:hover,
+.arm-edit-vehicle:hover,
+.arm-pay-btn:hover {
+  background: #005f8d;
+}
+
+.arm-del-vehicle {
+  background: #ca4a1f;
+  color: #fff;
+  border: none;
+}
+
+.arm-del-vehicle:hover {
+  background: #a43816;
+}
+
+/* === Forms === */
+#arm-vehicle-form {
+  border: 1px solid #ddd;
+  padding: 15px;
+  margin-bottom: 20px;
+  background: #fafafa;
+  border-radius: 4px;
+}
+
+#arm-vehicle-form table {
+  margin-bottom: 10px;
+}
+
+#arm-vehicle-form input[type="text"],
+#arm-vehicle-form input[type="number"] {
+  width: 100%;
+  padding: 6px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+}
+
+#arm-vehicle-form button {
+  margin-top: 10px;
+}
+
+/* === Profile Section === */
+#tab-profile label {
+  display: block;
+  margin-bottom: 8px;
+}
+
+#tab-profile input[type="text"],
+#tab-profile input[type="email"],
+#tab-profile input[type="tel"],
+#tab-profile input[type="password"] {
+  width: 300px;
+  padding: 6px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+}
+
+#tab-profile button {
+  margin-top: 10px;
+}
+
+/* === Responsive Design === */
+
+/* Tablet adjustments */
+@media (max-width: 1024px) {
+  .arm-tabs {
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .arm-tabs button {
+    flex: 1 1 48%;
+    text-align: center;
+  }
+
+  .arm-tab table th,
+  .arm-tab table td {
+    padding: 8px;
+    font-size: 14px;
+  }
+
+  #tab-profile input[type="text"],
+  #tab-profile input[type="email"],
+  #tab-profile input[type="tel"],
+  #tab-profile input[type="password"] {
+    width: 100%;
+  }
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .arm-tabs {
+    flex-direction: column;
+  }
+
+  .arm-tabs button {
+    width: 100%;
+    border-radius: 4px;
+  }
+
+  .arm-tab {
+    padding: 15px;
+  }
+
+  .arm-tab table,
+  .arm-tab thead,
+  .arm-tab tbody,
+  .arm-tab th,
+  .arm-tab td,
+  .arm-tab tr {
+    display: block;
+    width: 100%;
+  }
+
+  .arm-tab tr {
+    margin-bottom: 10px;
+    border-bottom: 2px solid #eee;
+  }
+
+  .arm-tab td {
+    padding-left: 40%;
+    position: relative;
+  }
+
+  .arm-tab td:before {
+    position: absolute;
+    top: 8px;
+    left: 10px;
+    width: 35%;
+    font-weight: 600;
+    white-space: nowrap;
+    content: attr(data-label);
+  }
+
+  .arm-btn,
+  .arm-add-vehicle,
+  .arm-edit-vehicle,
+  .arm-del-vehicle,
+  .arm-pay-btn {
+    display: block;
+    width: 100%;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+}
+
+/* Small phones */
+@media (max-width: 480px) {
+  .arm-dashboard {
+    margin: 10px 0;
+  }
+
+  .arm-tab {
+    padding: 10px;
+  }
+
+  #arm-vehicle-form,
+  #tab-profile input,
+  #tab-profile textarea {
+    width: 100%;
+  }
+}
+
+/* Mobile form: stack rows with labels */
+@media (max-width: 768px) {
+  .arm-profile-table td {
+    display: block;
+    width: 100%;
+    text-align: left;
+  }
+  .arm-profile-table td[data-label]::before {
+    content: attr(data-label) ": ";
+    font-weight: bold;
+    display: block;
+    margin-bottom: 4px;
+    color: #333;
+  }
+  .arm-profile-table input,
+  .arm-profile-table select,
+  .arm-profile-table textarea {
+    width: 100%;
+    box-sizing: border-box;
+  }
+}
+
+/* Mobile-friendly Vehicle Form */
+@media (max-width: 768px) {
+  .arm-vehicle-table td {
+    display: block;
+    width: 100%;
+    text-align: left;
+  }
+
+  .arm-vehicle-table td[data-label]::before {
+    content: attr(data-label) ": ";
+    font-weight: bold;
+    display: block;
+    margin-bottom: 4px;
+    color: #333;
+  }
+
+  .arm-vehicle-table input,
+  .arm-vehicle-table select,
+  .arm-vehicle-table textarea {
+    width: 100%;
+    box-sizing: border-box;
+  }
+}

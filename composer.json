@@ -1,0 +1,7 @@
+{
+    "require": {
+        "dompdf/dompdf": "^3.1",
+        "stripe/stripe-php": "^17.6",
+        "paypal/paypal-server-sdk": "^1.1"
+    }
+}

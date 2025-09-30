@@ -1,0 +1,201 @@
+<?php
+namespace ARM\Public;
+
+if ( ! defined( 'ABSPATH' ) ) exit;
+
+class Customer_Dashboard {
+
+    public static function boot() {
+        add_shortcode('arm_customer_dashboard', [__CLASS__, 'render_dashboard']);
+        add_action('wp_enqueue_scripts', [__CLASS__, 'enqueue_assets']);
+        add_action('wp_ajax_arm_vehicle_crud', [__CLASS__, 'ajax_vehicle_crud']);
+    }
+
+    /** ===== Assets ===== */
+    public static function enqueue_assets() {
+        if (!is_user_logged_in()) return;
+        if (!is_page() && !has_shortcode(get_post()->post_content ?? '', 'arm_customer_dashboard')) return;
+
+        wp_enqueue_style('arm-customer-dashboard', ARM_RE_URL.'assets/css/arm-customer-dashboard.css', [], ARM_RE_VERSION);
+        wp_enqueue_script('arm-customer-dashboard', ARM_RE_URL.'assets/js/arm-customer-dashboard.js', ['jquery'], ARM_RE_VERSION, true);
+        wp_localize_script('arm-customer-dashboard', 'ARM_CUSTOMER', [
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce'    => wp_create_nonce('arm_customer_nonce'),
+        ]);
+    }
+
+    /** ===== Dashboard Shortcode ===== */
+    public static function render_dashboard() {
+        if (!is_user_logged_in()) {
+            return '<p>'.__('Please log in to access your dashboard.', 'arm-repair-estimates').'</p>';
+        }
+
+        $user = wp_get_current_user();
+        if (!in_array('arm_customer', (array)$user->roles)) {
+            return '<p>'.__('Access denied.','arm-repair-estimates').'</p>';
+        }
+
+        ob_start();
+        ?>
+        <div class="arm-customer-dashboard">
+            <h2><?php echo esc_html__('Welcome, ','arm-repair-estimates').esc_html($user->display_name); ?></h2>
+
+            <nav class="arm-tabs">
+                <button data-tab="vehicles" class="active"><?php _e('My Vehicles','arm-repair-estimates'); ?></button>
+                <button data-tab="estimates"><?php _e('Estimates','arm-repair-estimates'); ?></button>
+                <button data-tab="invoices"><?php _e('Invoices','arm-repair-estimates'); ?></button>
+                <button data-tab="profile"><?php _e('Profile','arm-repair-estimates'); ?></button>
+            </nav>
+
+            <section id="tab-vehicles" class="arm-tab active">
+                <?php self::render_vehicles($user->ID); ?>
+            </section>
+            <section id="tab-estimates" class="arm-tab">
+                <?php self::render_estimates($user->ID); ?>
+            </section>
+            <section id="tab-invoices" class="arm-tab">
+                <?php self::render_invoices($user->ID); ?>
+            </section>
+            <section id="tab-profile" class="arm-tab">
+                <?php self::render_profile($user); ?>
+            </section>
+        </div>
+        <?php
+        return ob_get_clean();
+    }
+
+    /** ===== Vehicles Tab ===== */
+    private static function render_vehicles($user_id) {
+        global $wpdb;
+        $tbl = $wpdb->prefix.'arm_vehicles';
+        $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $tbl WHERE user_id=%d AND deleted_at IS NULL ORDER BY year DESC, make ASC, model ASC", $user_id));
+        ?>
+        <h3><?php _e('My Vehicles','arm-repair-estimates'); ?></h3>
+        <table class="widefat striped">
+            <thead><tr><th><?php _e('Year','arm-repair-estimates'); ?></th><th><?php _e('Make','arm-repair-estimates'); ?></th><th><?php _e('Model','arm-repair-estimates'); ?></th><th><?php _e('Actions','arm-repair-estimates'); ?></th></tr></thead>
+            <tbody>
+            <?php if ($rows): foreach ($rows as $v): ?>
+                <tr>
+                    <td><?php echo esc_html($v->year); ?></td>
+                    <td><?php echo esc_html($v->make); ?></td>
+                    <td><?php echo esc_html($v->model); ?></td>
+                    <td>
+                        <button class="arm-edit-vehicle" data-id="<?php echo (int)$v->id; ?>"><?php _e('Edit','arm-repair-estimates'); ?></button>
+                        <button class="arm-del-vehicle" data-id="<?php echo (int)$v->id; ?>"><?php _e('Delete','arm-repair-estimates'); ?></button>
+                    </td>
+                </tr>
+            <?php endforeach; else: ?>
+                <tr><td colspan="4"><?php _e('No vehicles yet.','arm-repair-estimates'); ?></td></tr>
+            <?php endif; ?>
+            </tbody>
+        </table>
+
+        <button class="arm-add-vehicle"><?php _e('Add Vehicle','arm-repair-estimates'); ?></button>
+        <div id="arm-vehicle-form" style="display:none;">
+            <h4><?php _e('Vehicle Details','arm-repair-estimates'); ?></h4>
+            <form>
+                <input type="hidden" name="id" value="">
+                <label><?php _e('Year','arm-repair-estimates'); ?> <input type="number" name="year" required></label>
+                <label><?php _e('Make','arm-repair-estimates'); ?> <input type="text" name="make" required></label>
+                <label><?php _e('Model','arm-repair-estimates'); ?> <input type="text" name="model" required></label>
+                <label><?php _e('Engine','arm-repair-estimates'); ?> <input type="text" name="engine"></label>
+                <label><?php _e('Trim','arm-repair-estimates'); ?> <input type="text" name="trim"></label>
+                <button type="submit"><?php _e('Save','arm-repair-estimates'); ?></button>
+            </form>
+        </div>
+        <?php
+    }
+
+    /** ===== Estimates Tab ===== */
+    private static function render_estimates($user_id) {
+        global $wpdb;
+        $tbl = $wpdb->prefix.'arm_estimates';
+        $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $tbl WHERE user_id=%d ORDER BY created_at DESC", $user_id));
+        ?>
+        <h3><?php _e('My Estimates','arm-repair-estimates'); ?></h3>
+        <?php if ($rows): ?>
+            <ul class="arm-estimates-list">
+            <?php foreach ($rows as $e): ?>
+                <li>
+                    <a href="<?php echo esc_url($e->view_url); ?>" target="_blank">
+                        <?php echo esc_html("Estimate #{$e->id} - {$e->status} - {$e->created_at}"); ?>
+                    </a>
+                </li>
+            <?php endforeach; ?>
+            </ul>
+        <?php else: ?>
+            <p><?php _e('No estimates available.','arm-repair-estimates'); ?></p>
+        <?php endif;
+    }
+
+    /** ===== Invoices Tab ===== */
+    private static function render_invoices($user_id) {
+        global $wpdb;
+        $tbl = $wpdb->prefix.'arm_invoices';
+        $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $tbl WHERE user_id=%d ORDER BY created_at DESC", $user_id));
+        ?>
+        <h3><?php _e('My Invoices','arm-repair-estimates'); ?></h3>
+        <?php if ($rows): ?>
+            <ul class="arm-invoices-list">
+            <?php foreach ($rows as $i): ?>
+                <li>
+                    <a href="<?php echo esc_url($i->view_url); ?>" target="_blank">
+                        <?php echo esc_html("Invoice #{$i->id} - {$i->status} - {$i->created_at}"); ?>
+                    </a>
+                </li>
+            <?php endforeach; ?>
+            </ul>
+        <?php else: ?>
+            <p><?php _e('No invoices available.','arm-repair-estimates'); ?></p>
+        <?php endif;
+    }
+
+    /** ===== Profile Tab ===== */
+    private static function render_profile($user) {
+        ?>
+        <h3><?php _e('My Profile','arm-repair-estimates'); ?></h3>
+        <form method="post">
+            <?php wp_nonce_field('arm_update_profile','arm_profile_nonce'); ?>
+            <label><?php _e('Name','arm-repair-estimates'); ?> <input type="text" name="display_name" value="<?php echo esc_attr($user->display_name); ?>"></label>
+            <label><?php _e('Email','arm-repair-estimates'); ?> <input type="email" name="user_email" value="<?php echo esc_attr($user->user_email); ?>"></label>
+            <button type="submit"><?php _e('Update Profile','arm-repair-estimates'); ?></button>
+        </form>
+        <?php
+    }
+
+    /** ===== AJAX Vehicle CRUD ===== */
+    public static function ajax_vehicle_crud() {
+        check_ajax_referer('arm_customer_nonce','nonce');
+        if (!is_user_logged_in()) wp_send_json_error(['message'=>'Not logged in']);
+        $user_id = get_current_user_id();
+        global $wpdb; $tbl = $wpdb->prefix.'arm_vehicles';
+
+        $action = sanitize_text_field($_POST['action_type'] ?? '');
+        if ($action === 'add' || $action === 'edit') {
+            $data = [
+                'year' => intval($_POST['year']),
+                'make' => sanitize_text_field($_POST['make']),
+                'model'=> sanitize_text_field($_POST['model']),
+                'engine'=> sanitize_text_field($_POST['engine']),
+                'trim'  => sanitize_text_field($_POST['trim']),
+                'user_id'=> $user_id,
+                'updated_at'=> current_time('mysql'),
+            ];
+            if ($action==='add') {
+                $data['created_at'] = current_time('mysql');
+                $wpdb->insert($tbl,$data);
+            } else {
+                $id=intval($_POST['id']);
+                $wpdb->update($tbl,$data,['id'=>$id,'user_id'=>$user_id]);
+            }
+            wp_send_json_success(['message'=>'Saved']);
+        }
+        elseif ($action==='delete') {
+            $id=intval($_POST['id']);
+            $wpdb->update($tbl,['deleted_at'=>current_time('mysql')],['id'=>$id,'user_id'=>$user_id]);
+            wp_send_json_success(['message'=>'Deleted']);
+        }
+
+        wp_send_json_error(['message'=>'Invalid request']);
+    }
+}

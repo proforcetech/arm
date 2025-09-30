@@ -1,0 +1,13 @@
+.arm-stats {
+  display:flex;
+  gap:2em;
+  list-style:none;
+  padding:0;
+}
+.arm-stats li {
+  background:#f8f8f8;
+  padding:10px 15px;
+  border:1px solid #ddd;
+  border-radius:6px;
+  font-size:14px;
+}

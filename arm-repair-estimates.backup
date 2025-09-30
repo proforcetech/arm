@@ -1,0 +1,876 @@
+<?php
+/**
+ * Plugin Name: ARM Repair Estimates
+ * Description: Receive repair estimate requests with dynamic vehicle selector and build/send estimates customers can accept online.
+ * Version: 1.2.0
+ * Author: ARM
+ * Text Domain: arm-repair-estimates
+ */
+
+if (!defined('ABSPATH')) exit;
+
+define('ARM_RE_VERSION', '1.2.0');
+define('ARM_RE_PATH', plugin_dir_path(__FILE__));
+define('ARM_RE_URL',  plugin_dir_url(__FILE__));
+
+/** ==== Core Modules ==== */
+require_once ARM_RE_PATH . 'includes/class-arm-estimates.php';
+
+/** ==== Extended Modules (Invoices, PDFs, Bundles, Payments, CRM, Export, Parts) ==== */
+require_once ARM_RE_PATH.'includes/class-arm-audit.php';
+require_once ARM_RE_PATH.'includes/class-arm-pdf.php';
+require_once ARM_RE_PATH.'includes/class-arm-invoices.php';
+require_once ARM_RE_PATH.'includes/class-arm-bundles.php';
+require_once ARM_RE_PATH.'includes/class-arm-payments.php';  // Stripe
+require_once ARM_RE_PATH.'includes/class-arm-paypal.php';    // PayPal
+require_once ARM_RE_PATH.'includes/class-arm-zoho.php';
+require_once ARM_RE_PATH.'includes/class-arm-export.php';    // CSV
+require_once ARM_RE_PATH.'includes/class-arm-partstech.php'; // VIN + catalog + markup
+
+class ARM_Repair_Estimates {
+
+    public function __construct() {
+        /** Activation / uninstall hooks */
+        register_activation_hook(__FILE__, [$this, 'activate']);
+        register_uninstall_hook(__FILE__, ['ARM_Repair_Estimates', 'uninstall']);
+
+        /** Front-end assets + shortcode */
+        add_action('wp_enqueue_scripts', [$this, 'enqueue_assets']);
+        add_shortcode('arm_repair_estimate_form', [$this, 'shortcode_form']);
+
+        /** AJAX for dynamic vehicle options + request submission */
+        add_action('wp_ajax_arm_get_vehicle_options',    [$this, 'ajax_get_vehicle_options']);
+        add_action('wp_ajax_nopriv_arm_get_vehicle_options', [$this, 'ajax_get_vehicle_options']);
+        add_action('wp_ajax_arm_submit_estimate',        [$this, 'ajax_submit_estimate']);
+        add_action('wp_ajax_nopriv_arm_submit_estimate', [$this, 'ajax_submit_estimate']);
+
+        /** Admin menus, settings, assets */
+        add_action('admin_menu',           [$this, 'admin_menus']);
+        add_action('admin_init',           [$this, 'register_settings']);
+        add_action('admin_enqueue_scripts',[$this, 'admin_assets']);
+
+        /** Boot submodules */
+        ARM_RE_Estimates::boot();
+        ARM_RE_Audit::boot();
+        ARM_RE_PDF::boot();
+        ARM_RE_Invoices::boot();
+        ARM_RE_Bundles::boot();
+        ARM_RE_Payments::boot(); // Stripe Checkout + webhook
+        ARM_RE_PayPal::boot();   // PayPal Checkout
+        ARM_RE_Export::boot();   // CSV exports
+        ARM_RE_PartsTech::boot();// VIN decode + search + markup
+        ARM_RE_Zoho::boot();     // CRM pushes
+    }
+
+    /** ===== Activation / Uninstall ===== */
+    public function activate() {
+        global $wpdb;
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        $charset = $wpdb->get_charset_collate();
+
+        $vehicle_table  = $wpdb->prefix . 'arm_vehicle_data';
+        $service_table  = $wpdb->prefix . 'arm_service_types';
+        $requests_table = $wpdb->prefix . 'arm_estimate_requests';
+
+        // Vehicle dimension table
+        dbDelta("CREATE TABLE $vehicle_table (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            year SMALLINT NOT NULL,
+            make VARCHAR(64) NOT NULL,
+            model VARCHAR(64) NOT NULL,
+            engine VARCHAR(128) NOT NULL,
+            drive VARCHAR(32) NOT NULL,
+            trim VARCHAR(128) NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY combo (year, make, model, engine, drive, trim),
+            KEY yr (year), KEY mk (make), KEY mdl (model), KEY eng (engine), KEY drv (drive), KEY trm (trim)
+        ) $charset;");
+
+        // Service types
+        dbDelta("CREATE TABLE $service_table (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            name VARCHAR(128) NOT NULL,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            sort_order INT NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY name (name),
+            KEY active (is_active),
+            KEY sort (sort_order)
+        ) $charset;");
+
+        // Incoming estimate requests
+        dbDelta("CREATE TABLE $requests_table (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            vehicle_year SMALLINT NULL,
+            vehicle_make VARCHAR(64) NULL,
+            vehicle_model VARCHAR(64) NULL,
+            vehicle_engine VARCHAR(128) NULL,
+            vehicle_drive VARCHAR(32) NULL,
+            vehicle_trim VARCHAR(128) NULL,
+            vehicle_other TEXT NULL,
+            service_type_id BIGINT UNSIGNED NULL,
+            issue_description TEXT NULL,
+            first_name VARCHAR(64) NOT NULL,
+            last_name VARCHAR(64) NOT NULL,
+            email VARCHAR(128) NOT NULL,
+            phone VARCHAR(32) NULL,
+            customer_address VARCHAR(200) NOT NULL,
+            customer_city VARCHAR(100) NOT NULL,
+            customer_zip VARCHAR(20) NOT NULL,
+            service_same_as_customer TINYINT(1) NOT NULL DEFAULT 0,
+            service_address VARCHAR(200) NOT NULL,
+            service_city VARCHAR(100) NOT NULL,
+            service_zip VARCHAR(20) NOT NULL,
+            delivery_email TINYINT(1) NOT NULL DEFAULT 0,
+            delivery_sms TINYINT(1) NOT NULL DEFAULT 0,
+            delivery_both TINYINT(1) NOT NULL DEFAULT 0,
+            terms_accepted TINYINT(1) NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY stype (service_type_id),
+            KEY created_at (created_at)
+        ) $charset;");
+
+        // Seed example service types
+        $count = (int) $wpdb->get_var("SELECT COUNT(*) FROM $service_table");
+        if ($count === 0) {
+            $wpdb->insert($service_table, ['name' => 'General Diagnostics', 'is_active' => 1, 'sort_order' => 10]);
+            $wpdb->insert($service_table, ['name' => 'Brake Service',        'is_active' => 1, 'sort_order' => 20]);
+            $wpdb->insert($service_table, ['name' => 'AC Service',           'is_active' => 1, 'sort_order' => 30]);
+        }
+
+	// Defaults for new settings
+	if (!get_option('arm_re_tax_apply')) {
+    		update_option('arm_re_tax_apply', 'parts_labor'); // parts_labor | parts_only
+	}
+	if (!get_option('arm_re_callout_default')) {
+    		update_option('arm_re_callout_default', '0');
+	}
+	if (!get_option('arm_re_mileage_rate_default')) {
+    		update_option('arm_re_mileage_rate_default', '0');
+	}
+
+        // Defaults
+        if (!get_option('arm_re_terms_html')) {
+            update_option('arm_re_terms_html', '<h3>Terms & Conditions</h3><p><strong>Please read:</strong> Estimates are based on provided information and initial inspection; final pricing may vary after diagnostics.</p>');
+        }
+        if (!get_option('arm_re_notify_email')) {
+            update_option('arm_re_notify_email', get_option('admin_email'));
+        }
+        if (!get_option('arm_re_labor_rate')) update_option('arm_re_labor_rate', 125);
+        if (!get_option('arm_re_tax_rate'))   update_option('arm_re_tax_rate', 0);
+
+        // Submodule DB tables
+        ARM_RE_Estimates::install_tables();
+        ARM_RE_Audit::install_tables();
+        ARM_RE_PDF::install_tables();
+        ARM_RE_Invoices::install_tables();
+        ARM_RE_Bundles::install_tables();
+        ARM_RE_Payments::install_tables(); // no-op safe
+        ARM_RE_PayPal::install_tables();   // no-op safe
+    }
+
+    public static function uninstall() {
+        // Intentionally keep data on uninstall.
+    }
+
+    /** ===== Front-end assets ===== */
+    public function enqueue_assets() {
+        if (!is_singular()) return;
+        wp_enqueue_style('arm-re-frontend', ARM_RE_URL . 'assets/css/arm-frontend.css', [], ARM_RE_VERSION);
+        wp_enqueue_script('arm-re-frontend', ARM_RE_URL . 'assets/js/arm-frontend.js', ['jquery'], ARM_RE_VERSION, true);
+        wp_localize_script('arm-re-frontend', 'ARM_RE', [
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce'    => wp_create_nonce('arm_re_nonce'),
+            'msgs'     => [
+                'required' => __('Please fill all required fields and accept Terms.', 'arm-repair-estimates'),
+                'ok'       => __('Thanks! Your estimate request has been submitted.', 'arm-repair-estimates'),
+                'error'    => __('Unable to submit right now. Please try again.', 'arm-repair-estimates'),
+            ],
+        ]);
+    }
+
+    /** ===== Admin assets ===== */
+    public function admin_assets($hook) {
+        if (strpos($hook, 'arm-repair') === false) return;
+        wp_enqueue_style('arm-re-admin', ARM_RE_URL . 'assets/css/arm-frontend.css', [], ARM_RE_VERSION);
+    }
+
+    /** ===== Shortcode: Public Request Form ===== */
+    public function shortcode_form($atts) {
+        ob_start();
+        $terms = wp_kses_post(get_option('arm_re_terms_html', ''));
+        ?>
+        <form id="arm-repair-estimate-form" class="arm-re-form" novalidate>
+          <?php wp_nonce_field('arm_re_submit', 'arm_re_submit_nonce'); ?>
+
+          <h3><?php _e('Vehicle Selection', 'arm-repair-estimates'); ?></h3>
+          <div class="arm-grid">
+            <div>
+              <label for="arm_year"><?php _e('Year', 'arm-repair-estimates'); ?> *</label>
+              <select id="arm_year" name="vehicle_year" required>
+                <option value=""><?php _e('Select Year', 'arm-repair-estimates'); ?></option>
+              </select>
+            </div>
+            <div>
+              <label for="arm_make"><?php _e('Make', 'arm-repair-estimates'); ?> *</label>
+              <select id="arm_make" name="vehicle_make" required disabled>
+                <option value=""><?php _e('Select Make', 'arm-repair-estimates'); ?></option>
+              </select>
+            </div>
+            <div>
+              <label for="arm_model"><?php _e('Model', 'arm-repair-estimates'); ?> *</label>
+              <select id="arm_model" name="vehicle_model" required disabled>
+                <option value=""><?php _e('Select Model', 'arm-repair-estimates'); ?></option>
+              </select>
+            </div>
+            <div>
+              <label for="arm_engine"><?php _e('Engine', 'arm-repair-estimates'); ?> *</label>
+              <select id="arm_engine" name="vehicle_engine" required disabled>
+                <option value=""><?php _e('Select Engine', 'arm-repair-estimates'); ?></option>
+              </select>
+            </div>
+            <div>
+              <label for="arm_drive"><?php _e('Drive', 'arm-repair-estimates'); ?> *</label>
+              <select id="arm_drive" name="vehicle_drive" required disabled>
+                <option value=""><?php _e('Select Drive', 'arm-repair-estimates'); ?></option>
+              </select>
+            </div>
+            <div>
+              <label for="arm_trim"><?php _e('Trim', 'arm-repair-estimates'); ?> *</label>
+              <select id="arm_trim" name="vehicle_trim" required disabled>
+                <option value=""><?php _e('Select Trim', 'arm-repair-estimates'); ?></option>
+              </select>
+            </div>
+          </div>
+
+          <div class="arm-row arm-other">
+            <label><input type="checkbox" id="arm_other_toggle"> <?php _e('Other', 'arm-repair-estimates'); ?></label>
+            <input type="text" id="arm_other_text" name="vehicle_other" placeholder="<?php esc_attr_e('Enter vehicle info (Year/Make/Model/Engine/Drive/Trim)', 'arm-repair-estimates'); ?>" style="display:none;">
+          </div>
+
+          <div class="arm-row">
+            <label for="arm_service_type"><?php _e('Service Type', 'arm-repair-estimates'); ?> *</label>
+            <select id="arm_service_type" name="service_type_id" required>
+              <option value=""><?php _e('Select a Service Type', 'arm-repair-estimates'); ?></option>
+              <?php $this->render_service_type_options(); ?>
+            </select>
+          </div>
+
+          <div class="arm-row">
+            <label for="arm_issue_desc"><?php _e("Describe Your Vehicle's Issues", 'arm-repair-estimates'); ?></label>
+            <textarea id="arm_issue_desc" name="issue_description" rows="5" placeholder="<?php esc_attr_e('What problems are you experiencing?', 'arm-repair-estimates'); ?>"></textarea>
+          </div>
+
+          <h3><?php _e('Contact Information', 'arm-repair-estimates'); ?></h3>
+          <div class="arm-grid">
+            <div>
+              <label for="arm_first_name"><?php _e('First Name', 'arm-repair-estimates'); ?> *</label>
+              <input type="text" id="arm_first_name" name="first_name" required>
+            </div>
+            <div>
+              <label for="arm_last_name"><?php _e('Last Name', 'arm-repair-estimates'); ?> *</label>
+              <input type="text" id="arm_last_name" name="last_name" required>
+            </div>
+            <div>
+              <label for="arm_email"><?php _e('Email', 'arm-repair-estimates'); ?> *</label>
+              <input type="email" id="arm_email" name="email" required>
+            </div>
+            <div>
+              <label for="arm_phone"><?php _e('Phone', 'arm-repair-estimates'); ?></label>
+              <input type="tel" id="arm_phone" name="phone" placeholder="(###) ###-####">
+            </div>
+            <div>
+              <label for="arm_cust_addr"><?php _e('Address', 'arm-repair-estimates'); ?> *</label>
+              <input type="text" id="arm_cust_addr" name="customer_address" required>
+            </div>
+            <div>
+              <label for="arm_cust_city"><?php _e('City', 'arm-repair-estimates'); ?> *</label>
+              <input type="text" id="arm_cust_city" name="customer_city" required>
+            </div>
+            <div>
+              <label for="arm_cust_zip"><?php _e('Zip Code', 'arm-repair-estimates'); ?> *</label>
+              <input type="text" id="arm_cust_zip" name="customer_zip" required>
+            </div>
+          </div>
+
+          <div class="arm-row">
+            <label><input type="checkbox" id="arm_same_addr" name="service_same_as_customer" value="1"> <strong><?php _e('Service Location', 'arm-repair-estimates'); ?>:</strong> <?php _e('Same as customer address', 'arm-repair-estimates'); ?></label>
+          </div>
+
+          <fieldset class="arm-fieldset">
+            <legend><?php _e('Service Location', 'arm-repair-estimates'); ?></legend>
+            <div class="arm-grid">
+              <div>
+                <label for="arm_srv_addr"><?php _e('Address', 'arm-repair-estimates'); ?> *</label>
+                <input type="text" id="arm_srv_addr" name="service_address" required>
+              </div>
+              <div>
+                <label for="arm_srv_city"><?php _e('City', 'arm-repair-estimates'); ?> *</label>
+                <input type="text" id="arm_srv_city" name="service_city" required>
+              </div>
+              <div>
+                <label for="arm_srv_zip"><?php _e('Zip Code', 'arm-repair-estimates'); ?> *</label>
+                <input type="text" id="arm_srv_zip" name="service_zip" required>
+              </div>
+            </div>
+          </fieldset>
+
+          <h3><?php _e('How do you want to receive your estimate?', 'arm-repair-estimates'); ?></h3>
+          <div class="arm-row arm-delivery">
+            <label><input type="checkbox" name="delivery_email" id="arm_del_email" value="1"> <?php _e('Email', 'arm-repair-estimates'); ?></label>
+            <label><input type="checkbox" name="delivery_sms"   id="arm_del_sms" value="1">   <?php _e('Text/SMS', 'arm-repair-estimates'); ?></label>
+            <label><input type="checkbox" name="delivery_both"  id="arm_del_both" value="1">  <?php _e('Both', 'arm-repair-estimates'); ?></label>
+          </div>
+          <p class="arm-sms-consent"><small><?php _e('By providing a telephone number and opting to receiving estimates by SMS and submitting this form you are consenting to be contacted by SMS text message. Message & data rates may apply. You can reply STOP to opt-out of further messaging.', 'arm-repair-estimates'); ?></small></p>
+
+          <div class="arm-terms-wrap">
+            <div class="arm-terms-content"><?php echo $terms; ?></div>
+            <label class="arm-terms-accept"><input type="checkbox" id="arm_terms" name="terms_accepted" value="1" required> <?php _e('I accept the Terms and Conditions', 'arm-repair-estimates'); ?> *</label>
+          </div>
+
+          <div class="arm-actions">
+            <button type="submit" class="arm-btn"><?php _e('Submit Estimate Request', 'arm-repair-estimates'); ?></button>
+          </div>
+
+          <div class="arm-msg" id="arm_msg" role="status" aria-live="polite" style="display:none;"></div>
+        </form>
+        <?php
+        return ob_get_clean();
+    }
+
+    private function render_service_type_options() {
+        global $wpdb;
+        $tbl = $wpdb->prefix . 'arm_service_types';
+        $rows = $wpdb->get_results("SELECT id, name FROM $tbl WHERE is_active=1 ORDER BY sort_order ASC, name ASC");
+        foreach ($rows as $r) {
+            printf('<option value="%d">%s</option>', (int)$r->id, esc_html($r->name));
+        }
+    }
+
+    /** ===== AJAX: Dynamic Vehicle Options ===== */
+    public function ajax_get_vehicle_options() {
+        check_ajax_referer('arm_re_nonce', 'nonce');
+        global $wpdb;
+        $tbl = $wpdb->prefix . 'arm_vehicle_data';
+
+        $hier = ['year','make','model','engine','drive','trim'];
+        $next = sanitize_text_field($_POST['next'] ?? '');
+        if (!in_array($next, $hier, true)) wp_send_json_error(['message' => 'Invalid level']);
+
+        $filters = [];
+        foreach ($hier as $h) {
+            if ($h === $next) break;
+            if (isset($_POST[$h]) && $_POST[$h] !== '') $filters[$h] = sanitize_text_field(wp_unslash($_POST[$h]));
+        }
+
+        $col = esc_sql($next);
+        $where = [];
+        $params = [];
+        foreach ($filters as $k => $v) { $where[] = "`$k` = %s"; $params[] = $v; }
+        $wheresql = $where ? ("WHERE " . implode(" AND ", $where)) : '';
+        $sql = "SELECT DISTINCT `$col` AS v FROM `$tbl` $wheresql ORDER BY v ASC";
+        $results = $params ? $wpdb->get_col($wpdb->prepare($sql, $params)) : $wpdb->get_col($sql);
+
+        wp_send_json_success(['options' => array_values(array_filter($results))]);
+    }
+
+    /** ===== AJAX: Submit Estimate Request ===== */
+    public function ajax_submit_estimate() {
+        check_ajax_referer('arm_re_nonce', 'nonce');
+        if (empty($_POST['arm_re_submit_nonce']) || !wp_verify_nonce($_POST['arm_re_submit_nonce'], 'arm_re_submit')) {
+            wp_send_json_error(['message' => 'Bad nonce']);
+        }
+
+        // Required inputs
+        $required = ['first_name','last_name','email','customer_address','customer_city','customer_zip','service_address','service_city','service_zip'];
+        foreach ($required as $r) if (empty($_POST[$r])) wp_send_json_error(['message' => 'Missing required fields']);
+        if (empty($_POST['terms_accepted'])) wp_send_json_error(['message' => 'Terms not accepted']);
+
+        // Vehicle: either "other" text or full selector chain
+        $other = !empty($_POST['vehicle_other']);
+        if (!$other) {
+            foreach (['vehicle_year','vehicle_make','vehicle_model','vehicle_engine','vehicle_drive','vehicle_trim'] as $r)
+                if (empty($_POST[$r])) wp_send_json_error(['message' => 'Missing vehicle selection']);
+        }
+
+        // Delivery prefs
+        $del_email = !empty($_POST['delivery_email']) ? 1 : 0;
+        $del_sms   = !empty($_POST['delivery_sms']) ? 1 : 0;
+        $del_both  = !empty($_POST['delivery_both']) ? 1 : 0;
+        if (($del_email + $del_sms + $del_both) === 0) wp_send_json_error(['message' => 'Select a delivery preference']);
+        if ($del_email && $del_sms) $del_both = 1;
+
+        global $wpdb;
+        $tbl = $wpdb->prefix . 'arm_estimate_requests';
+
+        $data = [
+            'vehicle_year'  => $other ? null : intval($_POST['vehicle_year']),
+            'vehicle_make'  => $other ? null : sanitize_text_field($_POST['vehicle_make'] ?? ''),
+            'vehicle_model' => $other ? null : sanitize_text_field($_POST['vehicle_model'] ?? ''),
+            'vehicle_engine'=> $other ? null : sanitize_text_field($_POST['vehicle_engine'] ?? ''),
+            'vehicle_drive' => $other ? null : sanitize_text_field($_POST['vehicle_drive'] ?? ''),
+            'vehicle_trim'  => $other ? null : sanitize_text_field($_POST['vehicle_trim'] ?? ''),
+            'vehicle_other' => $other ? sanitize_textarea_field($_POST['vehicle_other']) : null,
+            'service_type_id'   => !empty($_POST['service_type_id']) ? intval($_POST['service_type_id']) : null,
+            'issue_description' => isset($_POST['issue_description']) ? wp_kses_post($_POST['issue_description']) : null,
+            'first_name' => sanitize_text_field($_POST['first_name']),
+            'last_name'  => sanitize_text_field($_POST['last_name']),
+            'email'      => sanitize_email($_POST['email']),
+            'phone'      => sanitize_text_field($_POST['phone'] ?? ''),
+            'customer_address' => sanitize_text_field($_POST['customer_address']),
+            'customer_city'    => sanitize_text_field($_POST['customer_city']),
+            'customer_zip'     => sanitize_text_field($_POST['customer_zip']),
+            'service_same_as_customer' => !empty($_POST['service_same_as_customer']) ? 1 : 0,
+            'service_address' => sanitize_text_field($_POST['service_address']),
+            'service_city'    => sanitize_text_field($_POST['service_city']),
+            'service_zip'     => sanitize_text_field($_POST['service_zip']),
+            'delivery_email'  => $del_email,
+            'delivery_sms'    => $del_sms,
+            'delivery_both'   => $del_both,
+            'terms_accepted'  => 1,
+        ];
+
+        $ok = $wpdb->insert($tbl, $data);
+        if (!$ok) wp_send_json_error(['message' => 'DB error']);
+
+        // Email admin notification
+        $admin_email = sanitize_email(get_option('arm_re_notify_email', get_option('admin_email')));
+        if ($admin_email) {
+            $subj = sprintf('[Estimate Request] %s %s', $data['first_name'], $data['last_name']);
+            $veh  = $other ? $data['vehicle_other'] : trim("{$data['vehicle_year']} {$data['vehicle_make']} {$data['vehicle_model']} {$data['vehicle_engine']} {$data['vehicle_drive']} {$data['vehicle_trim']}");
+            $body = "New estimate request:\n\n"
+                  . "Name: {$data['first_name']} {$data['last_name']}\nEmail: {$data['email']}\nPhone: {$data['phone']}\n\n"
+                  . "Vehicle: {$veh}\nService Type ID: {$data['service_type_id']}\n\n"
+                  . "Issue:\n" . wp_strip_all_tags($data['issue_description']) . "\n\n"
+                  . "Customer Address: {$data['customer_address']}, {$data['customer_city']} {$data['customer_zip']}\n"
+                  . "Service Address: {$data['service_address']}, {$data['service_city']} {$data['service_zip']}\n\n"
+                  . "Delivery: " . ($del_both ? 'Both' : trim(($del_email?'Email ':'') . ($del_sms?'SMS':''))) . "\n"
+                  . "Submitted: " . current_time('mysql');
+            wp_mail($admin_email, $subj, $body);
+        }
+
+        wp_send_json_success(['message' => 'OK']);
+    }
+
+    /** ===== Admin Menus ===== */
+    public function admin_menus() {
+        add_menu_page(
+            __('Repair Estimates', 'arm-repair-estimates'),
+            __('Repair Estimates', 'arm-repair-estimates'),
+            'manage_options',
+            'arm-repair-estimates',
+            [$this, 'page_requests'],
+            'dashicons-clipboard',
+            27
+        );
+
+        add_submenu_page('arm-repair-estimates', __('Vehicle Data', 'arm-repair-estimates'), __('Vehicle Data', 'arm-repair-estimates'), 'manage_options', 'arm-repair-vehicles',  [$this, 'page_vehicles']);
+        add_submenu_page('arm-repair-estimates', __('Service Types', 'arm-repair-estimates'), __('Service Types', 'arm-repair-estimates'), 'manage_options', 'arm-repair-services',  [$this, 'page_services']);
+        add_submenu_page('arm-repair-estimates', __('Settings', 'arm-repair-estimates'),     __('Settings', 'arm-repair-estimates'),     'manage_options', 'arm-repair-settings',  [$this, 'page_settings']);
+
+        // Estimates builder/admin UI lives in the estimates module
+        add_submenu_page('arm-repair-estimates', __('Estimates', 'arm-repair-estimates'), __('Estimates', 'arm-repair-estimates'), 'manage_options', 'arm-repair-estimates-builder', ['ARM_RE_Estimates','render_admin']);
+
+        // (Invoices and Bundles submenus are added by their modules on ::boot())
+    }
+
+/** ===== Settings registration ===== */
+public function register_settings() {
+    // Core settings
+    register_setting('arm_re_settings', 'arm_re_terms_html',  ['type'=>'string','sanitize_callback'=>'wp_kses_post']);
+    register_setting('arm_re_settings', 'arm_re_notify_email',['type'=>'string','sanitize_callback'=>'sanitize_email']);
+    register_setting('arm_re_settings', 'arm_re_tax_rate',    ['type'=>'number','sanitize_callback'=>function($v){return is_numeric($v)? $v:0;}]);
+    register_setting('arm_re_settings', 'arm_re_labor_rate',  ['type'=>'number','sanitize_callback'=>function($v){return is_numeric($v)? $v:0;}]);
+
+    // Branding
+    register_setting('arm_re_settings', 'arm_re_shop_name',    ['type'=>'string','sanitize_callback'=>'sanitize_text_field']);
+    register_setting('arm_re_settings', 'arm_re_shop_address', ['type'=>'string','sanitize_callback'=>'wp_kses_post']);
+    register_setting('arm_re_settings', 'arm_re_shop_phone',   ['type'=>'string','sanitize_callback'=>'sanitize_text_field']);
+    register_setting('arm_re_settings', 'arm_re_shop_email',   ['type'=>'string','sanitize_callback'=>'sanitize_email']);
+    register_setting('arm_re_settings', 'arm_re_logo_url',     ['type'=>'string','sanitize_callback'=>'esc_url_raw']);
+
+    // NEW: tax application + travel fee defaults
+    register_setting('arm_re_settings', 'arm_re_tax_apply', [
+        'type' => 'string',
+        'sanitize_callback' => function($v){
+            $v = is_string($v) ? $v : '';
+            return in_array($v, ['parts_labor','parts_only'], true) ? $v : 'parts_labor';
+        }
+    ]);
+    register_setting('arm_re_settings', 'arm_re_callout_default', [
+        'type'=>'number',
+        'sanitize_callback'=>function($v){ return is_numeric($v) ? $v : 0; }
+    ]);
+    register_setting('arm_re_settings', 'arm_re_mileage_rate_default', [
+        'type'=>'number',
+        'sanitize_callback'=>function($v){ return is_numeric($v) ? $v : 0; }
+    ]);
+
+    // Delegate config registration to modules
+    ARM_RE_Payments::settings_fields();
+    ARM_RE_PayPal::settings_fields();
+    ARM_RE_Zoho::settings_fields();
+    ARM_RE_PartsTech::register_settings();
+}
+
+
+    /** ===== Settings page ===== */
+    public function page_settings() {
+        ?>
+        <div class="wrap">
+          <h1><?php _e('ARM Repair Estimates — Settings', 'arm-repair-estimates'); ?></h1>
+          <form method="post" action="options.php">
+            <?php settings_fields('arm_re_settings'); ?>
+            <table class="form-table" role="presentation">
+              <tr>
+                <th scope="row"><label for="arm_re_notify_email"><?php _e('Notification Email', 'arm-repair-estimates'); ?></label></th>
+                <td><input type="email" name="arm_re_notify_email" id="arm_re_notify_email" value="<?php echo esc_attr(get_option('arm_re_notify_email', get_option('admin_email'))); ?>" class="regular-text"></td>
+              </tr>
+              <tr>
+                <th scope="row"><?php _e('Terms & Conditions (HTML allowed)', 'arm-repair-estimates'); ?></th>
+                <td><?php
+                    $content = wp_kses_post(get_option('arm_re_terms_html',''));
+                    wp_editor($content, 'arm_re_terms_html', ['textarea_name' => 'arm_re_terms_html','media_buttons' => false,'textarea_rows' => 10]);
+                ?></td>
+              </tr>
+              <tr>
+                <th scope="row"><label for="arm_re_tax_rate"><?php _e('Default Tax Rate (%)', 'arm-repair-estimates'); ?></label></th>
+                <td><input type="number" step="0.01" name="arm_re_tax_rate" id="arm_re_tax_rate" value="<?php echo esc_attr(get_option('arm_re_tax_rate', '0')); ?>" class="small-text"> %</td>
+              </tr>
+              <tr>
+                <th scope="row"><label for="arm_re_labor_rate"><?php _e('Default Labor Rate', 'arm-repair-estimates'); ?></label></th>
+                <td><input type="number" step="0.01" name="arm_re_labor_rate" id="arm_re_labor_rate" value="<?php echo esc_attr(get_option('arm_re_labor_rate', '125')); ?>" class="regular-text"></td>
+              </tr>
+
+              <!-- Branding -->
+              <tr><th><?php _e('Shop Name','arm-repair-estimates'); ?></th>
+                  <td><input type="text" name="arm_re_shop_name" value="<?php echo esc_attr(get_option('arm_re_shop_name','')); ?>" class="regular-text"></td></tr>
+              <tr><th><?php _e('Shop Address','arm-repair-estimates'); ?></th>
+                  <td><textarea name="arm_re_shop_address" rows="3" class="large-text"><?php echo esc_textarea(get_option('arm_re_shop_address','')); ?></textarea></td></tr>
+              <tr><th><?php _e('Shop Phone','arm-repair-estimates'); ?></th>
+                  <td><input type="text" name="arm_re_shop_phone" value="<?php echo esc_attr(get_option('arm_re_shop_phone','')); ?>"></td></tr>
+              <tr><th><?php _e('Shop Email','arm-repair-estimates'); ?></th>
+                  <td><input type="email" name="arm_re_shop_email" value="<?php echo esc_attr(get_option('arm_re_shop_email','')); ?>"></td></tr>
+              <tr><th><?php _e('Logo URL','arm-repair-estimates'); ?></th>
+                  <td><input type="text" name="arm_re_logo_url" value="<?php echo esc_attr(get_option('arm_re_logo_url','')); ?>" class="regular-text">
+                      <p class="description"><?php _e('Use a Media Library URL.', 'arm-repair-estimates'); ?></p></td></tr>
+
+              <!-- Payments (Stripe) -->
+              <tr><th><?php _e('Currency','arm-repair-estimates'); ?></th>
+                  <td><input type="text" name="arm_re_currency" value="<?php echo esc_attr(get_option('arm_re_currency','usd')); ?>" class="small-text"> (usd, cad, …)</td></tr>
+              <tr><th><?php _e('Stripe Publishable Key','arm-repair-estimates'); ?></th>
+                  <td><input type="text" name="arm_re_stripe_pk" value="<?php echo esc_attr(get_option('arm_re_stripe_pk','')); ?>" class="regular-text"></td></tr>
+              <tr><th><?php _e('Stripe Secret Key','arm-repair-estimates'); ?></th>
+                  <td><input type="text" name="arm_re_stripe_sk" value="<?php echo esc_attr(get_option('arm_re_stripe_sk','')); ?>" class="regular-text"></td></tr>
+              <tr><th><?php _e('Stripe Webhook Secret','arm-repair-estimates'); ?></th>
+                  <td><input type="text" name="arm_re_stripe_whsec" value="<?php echo esc_attr(get_option('arm_re_stripe_whsec','')); ?>" class="regular-text">
+                      <p class="description"><?php printf(__('Webhook: %s', 'arm-repair-estimates'), '<code>'.esc_html( home_url('/wp-json/arm/v1/stripe/webhook') ).'</code>'); ?></p></td></tr>
+              <tr><th><?php _e('Payment Success URL','arm-repair-estimates'); ?></th>
+                  <td><input type="url" name="arm_re_pay_success" value="<?php echo esc_attr(get_option('arm_re_pay_success',home_url('/'))); ?>" class="regular-text"></td></tr>
+              <tr><th><?php _e('Payment Cancel URL','arm-repair-estimates'); ?></th>
+                  <td><input type="url" name="arm_re_pay_cancel" value="<?php echo esc_attr(get_option('arm_re_pay_cancel',home_url('/'))); ?>" class="regular-text"></td></tr>
+
+              <!-- PayPal -->
+              <tr><th><?php _e('PayPal Environment','arm-repair-estimates'); ?></th>
+                  <td><select name="arm_re_paypal_env">
+                    <?php foreach (['sandbox'=>'Sandbox','live'=>'Live'] as $k=>$v): ?>
+                      <option value="<?php echo esc_attr($k); ?>" <?php selected(get_option('arm_re_paypal_env','sandbox'), $k); ?>><?php echo esc_html($v); ?></option>
+                    <?php endforeach; ?>
+                  </select></td></tr>
+              <tr><th><?php _e('PayPal Client ID','arm-repair-estimates'); ?></th>
+                  <td><input type="text" name="arm_re_paypal_client_id" value="<?php echo esc_attr(get_option('arm_re_paypal_client_id','')); ?>" class="regular-text"></td></tr>
+              <tr><th><?php _e('PayPal Secret','arm-repair-estimates'); ?></th>
+                  <td><input type="text" name="arm_re_paypal_secret" value="<?php echo esc_attr(get_option('arm_re_paypal_secret','')); ?>" class="regular-text"></td></tr>
+
+              <!-- Zoho CRM -->
+              <tr><th><?php _e('Zoho DC','arm-repair-estimates'); ?></th>
+                  <td><input type="text" name="arm_zoho_dc" value="<?php echo esc_attr(get_option('arm_zoho_dc','com')); ?>" class="small-text"> (com, eu, in, com.au, com.cn)</td></tr>
+              <tr><th><?php _e('Zoho Client ID','arm-repair-estimates'); ?></th>
+                  <td><input type="text" name="arm_zoho_client_id" value="<?php echo esc_attr(get_option('arm_zoho_client_id','')); ?>" class="regular-text"></td></tr>
+              <tr><th><?php _e('Zoho Client Secret','arm-repair-estimates'); ?></th>
+                  <td><input type="text" name="arm_zoho_client_secret" value="<?php echo esc_attr(get_option('arm_zoho_client_secret','')); ?>" class="regular-text"></td></tr>
+              <tr><th><?php _e('Zoho Refresh Token','arm-repair-estimates'); ?></th>
+                  <td><input type="text" name="arm_zoho_refresh" value="<?php echo esc_attr(get_option('arm_zoho_refresh','')); ?>" class="regular-text"></td></tr>
+              <tr><th><?php _e('Zoho Deals Module','arm-repair-estimates'); ?></th>
+                  <td><input type="text" name="arm_zoho_module_deal" value="<?php echo esc_attr(get_option('arm_zoho_module_deal','Deals')); ?>" class="regular-text"></td></tr>
+
+              <!-- PartsTech + Markup -->
+              <tr><th><?php _e('PartsTech API Base','arm-repair-estimates'); ?></th>
+                  <td><input type="url" name="arm_partstech_base" value="<?php echo esc_attr(get_option('arm_partstech_base','https://api.partstech.com')); ?>" class="regular-text"></td></tr>
+              <tr><th><?php _e('PartsTech API Key','arm-repair-estimates'); ?></th>
+                  <td><input type="text" name="arm_partstech_api_key" value="<?php echo esc_attr(get_option('arm_partstech_api_key','')); ?>" class="regular-text"></td></tr>
+              <tr><th><?php _e('Parts Markup Tiers (JSON)','arm-repair-estimates'); ?></th>
+                  <td><textarea name="arm_re_markup_tiers" rows="5" class="large-text"><?php
+                    echo esc_textarea(get_option('arm_re_markup_tiers','[
+  {"min":0,"max":25,"pct":40},
+  {"min":25,"max":100,"pct":35},
+  {"min":100,"max":999999,"pct":30}
+]')); ?></textarea>
+                    <p class="description"><?php _e('Each tier: min/max cost & markup percent.', 'arm-repair-estimates'); ?></p></td></tr>
+<tr>
+  <th scope="row"><?php _e('Sales Tax Applies To','arm-repair-estimates'); ?></th>
+  <td>
+    <?php $tax_apply = get_option('arm_re_tax_apply', 'parts_labor'); ?>
+    <label style="margin-right:16px;">
+      <input type="radio" name="arm_re_tax_apply" value="parts_labor" <?php checked($tax_apply,'parts_labor'); ?>>
+      <?php _e('Parts & Labor','arm-repair-estimates'); ?>
+    </label>
+    <label>
+      <input type="radio" name="arm_re_tax_apply" value="parts_only" <?php checked($tax_apply,'parts_only'); ?>>
+      <?php _e('Parts Only','arm-repair-estimates'); ?>
+    </label>
+    <p class="description"><?php _e('When set to Parts Only, Labor/Fee lines are not included in the taxable subtotal (even if marked taxable).','arm-repair-estimates'); ?></p>
+  </td>
+</tr>
+
+<tr>
+  <th scope="row"><label for="arm_re_callout_default"><?php _e('Default Call-out Fee','arm-repair-estimates'); ?></label></th>
+  <td>
+    <input type="number" step="0.01" name="arm_re_callout_default" id="arm_re_callout_default"
+           value="<?php echo esc_attr(get_option('arm_re_callout_default','0')); ?>" class="regular-text">
+  </td>
+</tr>
+
+<tr>
+  <th scope="row"><label for="arm_re_mileage_rate_default"><?php _e('Default Mileage Rate (per mile)','arm-repair-estimates'); ?></label></th>
+  <td>
+    <input type="number" step="0.01" name="arm_re_mileage_rate_default" id="arm_re_mileage_rate_default"
+           value="<?php echo esc_attr(get_option('arm_re_mileage_rate_default','0')); ?>" class="regular-text">
+  </td>
+</tr>
+            
+</table>
+            <?php submit_button(); ?>
+          </form>
+        </div>
+        <?php
+    }
+
+    /** ===== Requests list (with CSV Export) ===== */
+    public function page_requests() {
+        global $wpdb;
+        $tbl = $wpdb->prefix . 'arm_estimate_requests';
+        $page = max(1, intval($_GET['paged'] ?? 1));
+        $per  = 20; $off  = ($page-1)*$per;
+
+        $items = $wpdb->get_results($wpdb->prepare("SELECT * FROM $tbl ORDER BY created_at DESC LIMIT %d OFFSET %d", $per, $off));
+        $total = (int) $wpdb->get_var("SELECT COUNT(*) FROM $tbl");
+        $pages = max(1, ceil($total / $per));
+        $export_url = esc_url( admin_url('admin-post.php?action=arm_re_export_requests') );
+        ?>
+        <div class="wrap">
+          <h1><?php _e('Estimate Requests', 'arm-repair-estimates'); ?></h1>
+          <p><a class="button" href="<?php echo $export_url; ?>"><?php _e('Export CSV','arm-repair-estimates'); ?></a></p>
+
+          <table class="widefat striped">
+            <thead><tr>
+              <th><?php _e('Date', 'arm-repair-estimates'); ?></th>
+              <th><?php _e('Customer', 'arm-repair-estimates'); ?></th>
+              <th><?php _e('Vehicle', 'arm-repair-estimates'); ?></th>
+              <th><?php _e('Service Type', 'arm-repair-estimates'); ?></th>
+              <th><?php _e('Delivery', 'arm-repair-estimates'); ?></th>
+              <th><?php _e('Actions', 'arm-repair-estimates'); ?></th>
+            </tr></thead>
+            <tbody>
+            <?php if ($items): foreach ($items as $r):
+                $veh = $r->vehicle_other ?: trim("{$r->vehicle_year} {$r->vehicle_make} {$r->vehicle_model} {$r->vehicle_engine} {$r->vehicle_drive} {$r->vehicle_trim}");
+                $delivery = $r->delivery_both ? 'Both' : trim(($r->delivery_email ? 'Email ' : '') . ($r->delivery_sms ? 'SMS' : ''));
+                $builder_url = admin_url('admin.php?page=arm-repair-estimates-builder&action=new&from_request='.(int)$r->id);
+            ?>
+              <tr>
+                <td><?php echo esc_html($r->created_at); ?></td>
+                <td><?php echo esc_html("{$r->first_name} {$r->last_name}"); ?><br><?php echo esc_html($r->email); ?></td>
+                <td><?php echo esc_html($veh ?: '—'); ?></td>
+                <td><?php echo esc_html($this->service_name($r->service_type_id)); ?></td>
+                <td><?php echo esc_html($delivery ?: '—'); ?></td>
+                <td><a class="button button-primary" href="<?php echo esc_url($builder_url); ?>"><?php _e('Create Estimate','arm-repair-estimates'); ?></a></td>
+              </tr>
+            <?php endforeach; else: ?>
+              <tr><td colspan="6"><?php _e('No submissions yet.', 'arm-repair-estimates'); ?></td></tr>
+            <?php endif; ?>
+            </tbody>
+          </table>
+          <?php if ($pages>1): ?>
+            <p>
+            <?php for ($i=1;$i<=$pages;$i++):
+                $url = esc_url(add_query_arg(['paged'=>$i]));
+                echo $i==$page ? "<strong>$i</strong> " : "<a href='$url'>$i</a> ";
+            endfor; ?>
+            </p>
+          <?php endif; ?>
+        </div>
+        <?php
+    }
+
+    private function service_name($id) {
+        if (!$id) return '';
+        global $wpdb;
+        $tbl = $wpdb->prefix . 'arm_service_types';
+        return (string) $wpdb->get_var($wpdb->prepare("SELECT name FROM $tbl WHERE id=%d", $id));
+    }
+
+    /** ===== Vehicle Data admin ===== */
+    public function page_vehicles() {
+        if (!current_user_can('manage_options')) return;
+        global $wpdb; $tbl = $wpdb->prefix . 'arm_vehicle_data';
+
+        if (!empty($_POST['arm_vehicle_nonce']) && wp_verify_nonce($_POST['arm_vehicle_nonce'], 'arm_vehicle_save')) {
+            $id = intval($_POST['id'] ?? 0);
+            $data = [
+                'year' => intval($_POST['year']),
+                'make' => sanitize_text_field($_POST['make']),
+                'model'=> sanitize_text_field($_POST['model']),
+                'engine'=> sanitize_text_field($_POST['engine']),
+                'drive' => sanitize_text_field($_POST['drive']),
+                'trim'  => sanitize_text_field($_POST['trim']),
+                'updated_at' => current_time('mysql'),
+            ];
+            if ($id) { $wpdb->update($tbl, $data, ['id'=>$id]); echo '<div class="updated"><p>Updated.</p></div>'; }
+            else { $data['created_at'] = current_time('mysql'); $wpdb->insert($tbl, $data); echo '<div class="updated"><p>Added.</p></div>'; }
+        }
+
+        if (!empty($_GET['del']) && !empty($_GET['_wpnonce']) && wp_verify_nonce($_GET['_wpnonce'], 'arm_vehicle_del')) {
+            $wpdb->delete($tbl, ['id'=>intval($_GET['del'])]); echo '<div class="updated"><p>Deleted.</p></div>';
+        }
+
+        $edit = null; if (!empty($_GET['edit'])) $edit = $wpdb->get_row($wpdb->prepare("SELECT * FROM $tbl WHERE id=%d", intval($_GET['edit'])));
+
+        $page = max(1, intval($_GET['paged'] ?? 1)); $per = 25; $off=($page-1)*$per;
+        $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $tbl ORDER BY year DESC, make ASC, model ASC, engine ASC, drive ASC, trim ASC LIMIT %d OFFSET %d", $per, $off));
+        $total = (int) $wpdb->get_var("SELECT COUNT(*) FROM $tbl"); $pages = max(1, ceil($total/$per));
+        ?>
+        <div class="wrap">
+          <h1><?php _e('Vehicle Data', 'arm-repair-estimates'); ?></h1>
+
+          <h2><?php echo $edit ? __('Edit Entry', 'arm-repair-estimates') : __('Add Entry', 'arm-repair-estimates'); ?></h2>
+          <form method="post">
+            <?php wp_nonce_field('arm_vehicle_save','arm_vehicle_nonce'); ?>
+            <input type="hidden" name="id" value="<?php echo esc_attr($edit->id ?? 0); ?>">
+            <table class="form-table" role="presentation">
+              <tr><th>Year</th><td><input type="number" name="year" required value="<?php echo esc_attr($edit->year ?? ''); ?>"></td></tr>
+              <tr><th>Make</th><td><input type="text" name="make" required value="<?php echo esc_attr($edit->make ?? ''); ?>"></td></tr>
+              <tr><th>Model</th><td><input type="text" name="model" required value="<?php echo esc_attr($edit->model ?? ''); ?>"></td></tr>
+              <tr><th>Engine</th><td><input type="text" name="engine" required value="<?php echo esc_attr($edit->engine ?? ''); ?>"></td></tr>
+              <tr><th>Drive</th><td><input type="text" name="drive" required value="<?php echo esc_attr($edit->drive ?? ''); ?>"></td></tr>
+              <tr><th>Trim</th><td><input type="text" name="trim" required value="<?php echo esc_attr($edit->trim ?? ''); ?>"></td></tr>
+            </table>
+            <?php submit_button($edit ? __('Update Entry','arm-repair-estimates') : __('Add Entry','arm-repair-estimates')); ?>
+          </form>
+
+          <h2><?php _e('Entries', 'arm-repair-estimates'); ?></h2>
+          <table class="widefat striped">
+            <thead><tr>
+              <th>ID</th><th>Year</th><th>Make</th><th>Model</th><th>Engine</th><th>Drive</th><th>Trim</th><th>Actions</th>
+            </tr></thead>
+            <tbody>
+            <?php if ($rows): foreach ($rows as $r):
+                $del_url = wp_nonce_url(add_query_arg(['del'=>$r->id]), 'arm_vehicle_del');
+                $edit_url= add_query_arg(['edit'=>$r->id]);
+            ?>
+              <tr>
+                <td><?php echo (int)$r->id; ?></td>
+                <td><?php echo esc_html($r->year); ?></td>
+                <td><?php echo esc_html($r->make); ?></td>
+                <td><?php echo esc_html($r->model); ?></td>
+                <td><?php echo esc_html($r->engine); ?></td>
+                <td><?php echo esc_html($r->drive); ?></td>
+                <td><?php echo esc_html($r->trim); ?></td>
+                <td><a href="<?php echo esc_url($edit_url); ?>"><?php _e('Edit','arm-repair-estimates'); ?></a> | <a href="<?php echo esc_url($del_url); ?>" onclick="return confirm('<?php echo esc_js(__('Delete this entry?','arm-repair-estimates')); ?>');"><?php _e('Delete','arm-repair-estimates'); ?></a></td>
+              </tr>
+            <?php endforeach; else: ?>
+              <tr><td colspan="8"><?php _e('No data yet.', 'arm-repair-estimates'); ?></td></tr>
+            <?php endif; ?>
+            </tbody>
+          </table>
+          <?php if ($pages>1): ?>
+            <p>
+            <?php for ($i=1;$i<=$pages;$i++):
+                $url = esc_url(add_query_arg(['paged'=>$i]));
+                echo $i==$page ? "<strong>$i</strong> " : "<a href='$url'>$i</a> ";
+            endfor; ?>
+            </p>
+          <?php endif; ?>
+        </div>
+        <?php
+    }
+
+    /** ===== Service Types admin ===== */
+    public function page_services() {
+        if (!current_user_can('manage_options')) return;
+        global $wpdb; $tbl = $wpdb->prefix . 'arm_service_types';
+
+        if (!empty($_POST['arm_services_nonce']) && wp_verify_nonce($_POST['arm_services_nonce'], 'arm_services_save')) {
+            $id = intval($_POST['id'] ?? 0);
+            $data = [
+                'name' => sanitize_text_field($_POST['name']),
+                'is_active' => !empty($_POST['is_active']) ? 1 : 0,
+                'sort_order' => intval($_POST['sort_order'] ?? 0),
+                'updated_at' => current_time('mysql')
+            ];
+            if ($id) { $wpdb->update($tbl, $data, ['id'=>$id]); echo '<div class="updated"><p>Updated.</p></div>'; }
+            else { $data['created_at'] = current_time('mysql'); $wpdb->insert($tbl, $data); echo '<div class="updated"><p>Added.</p></div>'; }
+        }
+        if (!empty($_GET['del']) && !empty($_GET['_wpnonce']) && wp_verify_nonce($_GET['_wpnonce'], 'arm_services_del')) {
+            $wpdb->delete($tbl, ['id'=>intval($_GET['del'])]); echo '<div class="updated"><p>Deleted.</p></div>';
+        }
+        $edit = null; if (!empty($_GET['edit'])) $edit = $wpdb->get_row($wpdb->prepare("SELECT * FROM $tbl WHERE id=%d", intval($_GET['edit'])));
+        $rows = $wpdb->get_results("SELECT * FROM $tbl ORDER BY sort_order ASC, name ASC");
+        ?>
+        <div class="wrap">
+          <h1><?php _e('Service Types', 'arm-repair-estimates'); ?></h1>
+
+          <h2><?php echo $edit ? __('Edit Service Type','arm-repair-estimates') : __('Add Service Type','arm-repair-estimates'); ?></h2>
+          <form method="post">
+            <?php wp_nonce_field('arm_services_save', 'arm_services_nonce'); ?>
+            <input type="hidden" name="id" value="<?php echo esc_attr($edit->id ?? 0); ?>">
+            <table class="form-table" role="presentation">
+              <tr><th><?php _e('Name','arm-repair-estimates'); ?></th><td><input type="text" name="name" required value="<?php echo esc_attr($edit->name ?? ''); ?>"></td></tr>
+              <tr><th><?php _e('Active','arm-repair-estimates'); ?></th><td><label><input type="checkbox" name="is_active" value="1" <?php checked(($edit->is_active ?? 1), 1); ?>> <?php _e('Active','arm-repair-estimates'); ?></label></td></tr>
+              <tr><th><?php _e('Sort Order','arm-repair-estimates'); ?></th><td><input type="number" name="sort_order" value="<?php echo esc_attr($edit->sort_order ?? 0); ?>"></td></tr>
+            </table>
+            <?php submit_button($edit ? __('Update','arm-repair-estimates') : __('Add','arm-repair-estimates')); ?>
+          </form>
+
+          <h2><?php _e('Service Types', 'arm-repair-estimates'); ?></h2>
+          <table class="widefat striped">
+            <thead><tr><th>ID</th><th><?php _e('Name','arm-repair-estimates'); ?></th><th><?php _e('Active','arm-repair-estimates'); ?></th><th><?php _e('Sort','arm-repair-estimates'); ?></th><th><?php _e('Actions','arm-repair-estimates'); ?></th></tr></thead>
+            <tbody>
+            <?php if ($rows): foreach ($rows as $r):
+                $del_url = wp_nonce_url(add_query_arg(['del'=>$r->id]), 'arm_services_del');
+                $edit_url= add_query_arg(['edit'=>$r->id]);
+            ?>
+              <tr>
+                <td><?php echo (int)$r->id; ?></td>
+                <td><?php echo esc_html($r->name); ?></td>
+                <td><?php echo $r->is_active ? __('Yes','arm-repair-estimates') : __('No','arm-repair-estimates'); ?></td>
+                <td><?php echo (int)$r->sort_order; ?></td>
+                <td><a href="<?php echo esc_url($edit_url); ?>"><?php _e('Edit','arm-repair-estimates'); ?></a> | <a href="<?php echo esc_url($del_url); ?>" onclick="return confirm('<?php echo esc_js(__('Delete this service type?','arm-repair-estimates')); ?>');"><?php _e('Delete','arm-repair-estimates'); ?></a></td>
+              </tr>
+            <?php endforeach; else: ?>
+              <tr><td colspan="5"><?php _e('No service types found.', 'arm-repair-estimates'); ?></td></tr>
+            <?php endif; ?>
+            </tbody>
+          </table>
+        </div>
+        <?php
+    }
+}
+
+new ARM_Repair_Estimates();
+
+/** Inject initial Year list inline when the shortcode is on the page */
+add_action('wp_footer', function () {
+    if (!is_singular()) return;
+    global $post;
+    if (!$post) return;
+    if (!has_shortcode($post->post_content ?? '', 'arm_repair_estimate_form')) return;
+    global $wpdb;
+    $tbl = $wpdb->prefix . 'arm_vehicle_data';
+    $years = $wpdb->get_col("SELECT DISTINCT year FROM $tbl ORDER BY year DESC");
+    echo '<script>window.ARM_RE_INIT_YEARS = ' . wp_json_encode(array_values($years)) . ';</script>';
+});
