@@ -20,7 +20,14 @@ class Controller {
             'end_datetime'  => $end,
             'status'        => 'pending'
         ]);
-        return $wpdb->insert_id;
+        $id = (int) $wpdb->insert_id;
+        if ($id) {
+            do_action('arm/appt/created', $id);
+            if (class_exists('\\ARM\\Integrations\\Twilio')) {
+                \ARM\Integrations\Twilio::schedule_appointment_reminder($id, $start);
+            }
+        }
+        return $id;
     }
 
     public static function update_status($id, $status) {

@@ -63,6 +63,12 @@ class Admin {
         $end=sanitize_text_field($_POST['end']);
         if($id){
             $wpdb->update($tbl,['start_datetime'=>$start,'end_datetime'=>$end],['id'=>$id]);
+            if (class_exists('\\ARM\\Integrations\\Twilio')) {
+                $row = $wpdb->get_row($wpdb->prepare("SELECT start_datetime FROM $tbl WHERE id=%d", $id));
+                if ($row && !empty($row->start_datetime)) {
+                    \ARM\Integrations\Twilio::schedule_appointment_reminder($id, $row->start_datetime);
+                }
+            }
         }
         wp_send_json_success();
     }

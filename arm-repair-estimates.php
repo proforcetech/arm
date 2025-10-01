@@ -46,6 +46,7 @@ add_action('plugins_loaded', function () {
     ARM\Integrations\Payments_PayPal::boot();
     ARM\Integrations\PartsTech::boot();
     ARM\Integrations\Zoho::boot();
+    ARM\Integrations\Twilio::boot();
 
     ARM\PDF\Generator::boot();
     ARM\Audit\Logger::boot();
