@@ -30,6 +30,7 @@ class Settings {
         \ARM\Integrations\Payments_PayPal::settings_fields();
         \ARM\Integrations\Zoho::settings_fields();
         \ARM\Integrations\PartsTech::register_settings();
+        \ARM\Integrations\Twilio::settings_fields();
 
         // New tax application + callout/mileage defaults
         register_setting('arm_re_settings', 'arm_re_tax_apply', [
@@ -76,7 +77,7 @@ class Settings {
         
         ?>
         <div class="wrap">
-          <h1><?php _e('ARM Repair Estimates — Settings','arm-repair-estimates'); ?></h1>
+          <h1><?php _e('ARM Repair Estimates â€” Settings','arm-repair-estimates'); ?></h1>
           <form method="post" action="options.php">
             <?php settings_fields('arm_re_settings'); ?>
             <table class="form-table" role="presentation">
@@ -180,6 +181,7 @@ $days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
   </tr>
 </table>
 
+            <?php \ARM\Integrations\Twilio::render_settings_section(); ?>
             <?php submit_button(); ?>
           </form>
         </div>

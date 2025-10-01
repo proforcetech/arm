@@ -98,6 +98,7 @@ class Controller {
         $eiT  = $wpdb->prefix . 'arm_estimate_items';
         $invT = $wpdb->prefix . 'arm_invoices';
         $iiT  = $wpdb->prefix . 'arm_invoice_items';
+        $cT   = $wpdb->prefix . 'arm_customers';
 
         $e = $wpdb->get_row($wpdb->prepare("SELECT * FROM $eT WHERE id=%d", $eid));
         if (!$e) wp_die('Estimate not found');
@@ -177,9 +178,23 @@ class Controller {
             $addedExtras++;
         }
 
-        // Audit log (namespaced audit if available)
         if (class_exists('\\ARM\\Audit\\Logger')) {
             \ARM\Audit\Logger::log('estimate', $eid, 'converted_to_invoice', 'admin', ['invoice_id' => $inv_id, 'extras' => $addedExtras]);
+        }
+
+        $invoice = $wpdb->get_row($wpdb->prepare("SELECT * FROM $invT WHERE id=%d", $inv_id));
+        $customer = $invoice ? $wpdb->get_row($wpdb->prepare("SELECT * FROM $cT WHERE id=%d", (int) $invoice->customer_id)) : null;
+        if ($invoice && $customer) {
+            $viewLink = add_query_arg(['arm_invoice' => $invoice->token], home_url('/'));
+            if (class_exists('\\ARM\\Links\\Shortlinks')) {
+                $short = \ARM\Links\Shortlinks::get_or_create_for_invoice((int) $invoice->id, (string) $invoice->token);
+                if (!empty($short)) {
+                    $viewLink = $short;
+                }
+            }
+            if (class_exists('\\ARM\\Integrations\\Twilio')) {
+                \ARM\Integrations\Twilio::send_invoice_notification($invoice, $customer, $viewLink);
+            }
         }
 
         wp_redirect(admin_url('admin.php?page=arm-repair-invoices&converted=' . $inv_id));
