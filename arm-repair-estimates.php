@@ -44,6 +44,7 @@ add_action('plugins_loaded', function () {
 
     ARM\Integrations\Payments_Stripe::boot();
     ARM\Integrations\Payments_PayPal::boot();
+    ARM\Integrations\Twilio::boot();
     ARM\Integrations\PartsTech::boot();
     ARM\Integrations\Zoho::boot();
 

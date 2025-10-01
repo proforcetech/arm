@@ -16,7 +16,7 @@ final class Activator {
         // Make sure dbDelta is available.
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
-        // If constants/files aren’t available yet (defensive), define/require them.
+        // If constants/files arenâ€™t available yet (defensive), define/require them.
         if (!defined('ARM_RE_PATH')) {
             define('ARM_RE_PATH', plugin_dir_path(dirname(__FILE__, 2)));
         }
@@ -163,6 +163,7 @@ final class Activator {
         if (class_exists('\\ARM\\Bundles\\Controller'))   \ARM\Bundles\Controller::install_tables();
         if (class_exists('\\ARM\\Integrations\\Payments_Stripe'))  \ARM\Integrations\Payments_Stripe::install_tables();
         if (class_exists('\\ARM\\Integrations\\Payments_PayPal'))    \ARM\Integrations\Payments_PayPal::install_tables();
+        if (class_exists('\\ARM\\Integrations\\Twilio'))            \ARM\Integrations\Twilio::install_tables();
 
     }
 
@@ -177,6 +178,7 @@ final class Activator {
             '\\ARM\\PDF\\Controller'       => 'includes/pdf/Controller.php',
             '\\ARM\\Integrations\\Payments_Stripe'  => 'includes/integrations/Payments_Stripe.php',
             '\\ARM\\Integrations\\Payments_PayPal'    => 'includes/integrations/Payments_PayPal.php',
+            '\\ARM\\Integrations\\Twilio'            => 'includes/integrations/Twilio.php',
         ];
         foreach ($map as $class => $rel) {
             if (!class_exists($class) && file_exists(ARM_RE_PATH . $rel)) {
