@@ -17,6 +17,9 @@ require_once ARM_RE_PATH . 'includes/install/class-activator.php';
 register_activation_hook(__FILE__, ['ARM\\Install\\Activator', 'activate']);
 register_uninstall_hook(__FILE__,  ['ARM\\Install\\Activator', 'uninstall']);
 
+// Ensure schema upgrades run when the plugin version changes.
+add_action('plugins_loaded', ['ARM\\Install\\Activator', 'maybe_upgrade'], 0);
+
 
 // Boot in phases (admin vs public)
 add_action('plugins_loaded', function () {
