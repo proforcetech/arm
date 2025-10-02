@@ -57,6 +57,25 @@ $can_act = in_array($est->status, ['SENT','NEEDS_REAPPROVAL'], true);
           <div><strong><?php _e('Expires', 'arm-repair-estimates'); ?>:</strong> <?php echo esc_html($est->expires_at); ?></div>
         <?php endif; ?>
         <div><strong><?php _e('Created', 'arm-repair-estimates'); ?>:</strong> <?php echo esc_html($est->created_at); ?></div>
+        <?php
+          $vehicle_parts = array_filter([
+              $est->vehicle_year ?? '',
+              $est->vehicle_make ?? '',
+              $est->vehicle_model ?? '',
+              $est->vehicle_engine ?? '',
+              $est->vehicle_trim ?? '',
+          ], function($part){ return $part !== null && $part !== ''; });
+          $vehicle_summary = trim(implode(' ', $vehicle_parts));
+        ?>
+        <?php if ($vehicle_summary || !empty($est->vehicle_vin) || !empty($est->vehicle_plate) || !empty($est->vehicle_mileage)): ?>
+          <div style="margin-top:8px;">
+            <strong><?php _e('Vehicle','arm-repair-estimates'); ?>:</strong>
+            <?php if ($vehicle_summary): ?><div><?php echo esc_html($vehicle_summary); ?></div><?php endif; ?>
+            <?php if (!empty($est->vehicle_plate)): ?><div><?php _e('License Plate','arm-repair-estimates'); ?>: <?php echo esc_html($est->vehicle_plate); ?></div><?php endif; ?>
+            <?php if (!empty($est->vehicle_vin)): ?><div><?php _e('VIN','arm-repair-estimates'); ?>: <?php echo esc_html($est->vehicle_vin); ?></div><?php endif; ?>
+            <?php if (!empty($est->vehicle_mileage)): ?><div><?php _e('Mileage','arm-repair-estimates'); ?>: <?php echo esc_html($est->vehicle_mileage); ?></div><?php endif; ?>
+          </div>
+        <?php endif; ?>
       </div>
     </div>
 

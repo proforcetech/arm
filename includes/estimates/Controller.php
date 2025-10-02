@@ -9,6 +9,8 @@ class Controller {
      * Boot: hooks (admin + public actions used by the estimates module)
      * -----------------------------------------------------------------*/
     public static function boot() {
+        self::maybe_upgrade_schema();
+
         // Admin actions
         add_action('admin_post_arm_re_save_estimate',   [__CLASS__, 'handle_save_estimate']);
         add_action('admin_post_arm_re_send_estimate',   [__CLASS__, 'handle_send_estimate']);
@@ -16,8 +18,41 @@ class Controller {
 
         // Admin AJAX (customer search for estimate builder)
         add_action('wp_ajax_arm_re_search_customers',   [__CLASS__, 'ajax_search_customers']);
+        add_action('wp_ajax_arm_re_customer_vehicles',  [__CLASS__, 'ajax_customer_vehicles']);
 
         // Public view & actions booted in PublicView class
+    }
+
+    /** Ensure the estimates table has vehicle linkage columns. */
+    private static function maybe_upgrade_schema(): void {
+        global $wpdb;
+        $table = $wpdb->prefix . 'arm_estimates';
+
+        // Check for vehicle_id column to detect whether the upgrade already ran.
+        $has_vehicle_id = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = 'vehicle_id'",
+                $table
+            )
+        );
+
+        if ($has_vehicle_id) {
+            return;
+        }
+
+        $wpdb->query(
+            "ALTER TABLE `$table`
+                ADD COLUMN vehicle_id BIGINT UNSIGNED NULL AFTER customer_id,
+                ADD COLUMN vehicle_year SMALLINT UNSIGNED NULL AFTER vehicle_id,
+                ADD COLUMN vehicle_make VARCHAR(80) NULL AFTER vehicle_year,
+                ADD COLUMN vehicle_model VARCHAR(120) NULL AFTER vehicle_make,
+                ADD COLUMN vehicle_engine VARCHAR(120) NULL AFTER vehicle_model,
+                ADD COLUMN vehicle_trim VARCHAR(120) NULL AFTER vehicle_engine,
+                ADD COLUMN vehicle_vin VARCHAR(64) NULL AFTER vehicle_trim,
+                ADD COLUMN vehicle_plate VARCHAR(32) NULL AFTER vehicle_vin,
+                ADD COLUMN vehicle_mileage VARCHAR(32) NULL AFTER vehicle_plate,
+                ADD KEY idx_vehicle_id (vehicle_id)"
+        );
     }
 
     /** ----------------------------------------------------------------
@@ -50,6 +85,15 @@ class Controller {
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             request_id BIGINT UNSIGNED NULL,
             customer_id BIGINT UNSIGNED NOT NULL,
+            vehicle_id BIGINT UNSIGNED NULL,
+            vehicle_year SMALLINT UNSIGNED NULL,
+            vehicle_make VARCHAR(80) NULL,
+            vehicle_model VARCHAR(120) NULL,
+            vehicle_engine VARCHAR(120) NULL,
+            vehicle_trim VARCHAR(120) NULL,
+            vehicle_vin VARCHAR(64) NULL,
+            vehicle_plate VARCHAR(32) NULL,
+            vehicle_mileage VARCHAR(32) NULL,
             estimate_no VARCHAR(32) NOT NULL,
             status ENUM('DRAFT','SENT','APPROVED','DECLINED','EXPIRED','NEEDS_REAPPROVAL') NOT NULL DEFAULT 'DRAFT',
             version INT NOT NULL DEFAULT 1,
@@ -71,6 +115,7 @@ class Controller {
             UNIQUE KEY estimate_no (estimate_no),
             UNIQUE KEY token (token),
             INDEX(customer_id), INDEX(request_id),
+            INDEX(vehicle_id),
             PRIMARY KEY(id)
         ) $charset;");
 
@@ -210,12 +255,25 @@ class Controller {
         $tblI = $wpdb->prefix.'arm_estimate_items';
         $tblJ = $wpdb->prefix.'arm_estimate_jobs';
         $tblR = $wpdb->prefix.'arm_estimate_requests';
+        $tblV = $wpdb->prefix.'arm_vehicles';
+
+        $prefill_customer = [];
+        $prefill_vehicle  = [];
 
         $defaults = [
             'id'=>0,
             'estimate_no'=> self::generate_estimate_no(),
             'status'=>'DRAFT',
             'customer_id'=>0,
+            'vehicle_id'=>0,
+            'vehicle_year'=>'',
+            'vehicle_make'=>'',
+            'vehicle_model'=>'',
+            'vehicle_engine'=>'',
+            'vehicle_trim'=>'',
+            'vehicle_vin'=>'',
+            'vehicle_plate'=>'',
+            'vehicle_mileage'=>'',
             'request_id'=>null,
             'tax_rate'=> (float) get_option('arm_re_tax_rate',0),
             'expires_at'=>'',
@@ -245,12 +303,102 @@ class Controller {
                     'first_name'=>$req->first_name,'last_name'=>$req->last_name,'email'=>$req->email,'phone'=>$req->phone,
                     'address'=>$req->customer_address,'city'=>$req->customer_city,'zip'=>$req->customer_zip
                 ];
+                $prefill_vehicle = [
+                    'vehicle_year'  => $req->vehicle_year,
+                    'vehicle_make'  => $req->vehicle_make,
+                    'vehicle_model' => $req->vehicle_model,
+                    'vehicle_engine'=> $req->vehicle_engine,
+                    'vehicle_trim'  => $req->vehicle_trim,
+                ];
             }
+        }
+
+        if (!$id && !empty($_GET['customer_id'])) {
+            $estimate->customer_id = (int) $_GET['customer_id'];
+        }
+        if (!$id && !empty($_GET['vehicle_id'])) {
+            $estimate->vehicle_id = (int) $_GET['vehicle_id'];
         }
 
         // If editing, load customer record
         $customer = null;
         if ($estimate->customer_id) $customer = $wpdb->get_row($wpdb->prepare("SELECT * FROM $tblC WHERE id=%d", $estimate->customer_id));
+
+        $vehicles = [];
+        if ($estimate->customer_id) {
+            $vehicles = $wpdb->get_results($wpdb->prepare("SELECT * FROM $tblV WHERE customer_id=%d ORDER BY year DESC, make ASC, model ASC", $estimate->customer_id));
+        }
+
+        $selected_vehicle = null;
+        if (!empty($estimate->vehicle_id)) {
+            foreach ($vehicles as $veh) {
+                if ((int) ($veh->id ?? 0) === (int) $estimate->vehicle_id) {
+                    $selected_vehicle = $veh;
+                    break;
+                }
+            }
+            if (!$selected_vehicle) {
+                $selected_vehicle = $wpdb->get_row($wpdb->prepare("SELECT * FROM $tblV WHERE id=%d", $estimate->vehicle_id));
+                if ($selected_vehicle && (int) ($selected_vehicle->customer_id ?? 0) === (int) $estimate->customer_id) {
+                    $vehicles[] = $selected_vehicle;
+                }
+            }
+        }
+
+        $vehicle_field_map = [
+            'vehicle_year'   => 'year',
+            'vehicle_make'   => 'make',
+            'vehicle_model'  => 'model',
+            'vehicle_engine' => 'engine',
+            'vehicle_trim'   => 'trim',
+            'vehicle_vin'    => 'vin',
+            'vehicle_plate'  => 'plate',
+            'vehicle_mileage'=> 'mileage',
+        ];
+
+        foreach ($vehicle_field_map as $estField => $prefKey) {
+            if ((string)($estimate->$estField ?? '') === '' && isset($prefill_vehicle[$estField])) {
+                $estimate->$estField = $prefill_vehicle[$estField];
+            }
+        }
+
+        if ($selected_vehicle) {
+            foreach ($vehicle_field_map as $estField => $srcField) {
+                $current = $estimate->$estField ?? '';
+                if ($current === '' || $current === null) {
+                    $estimate->$estField = $selected_vehicle->$srcField ?? '';
+                }
+            }
+        }
+
+        $vehicle_js = array_map(function($veh){
+            $label_parts = array_filter([
+                $veh->year ?? '',
+                $veh->make ?? '',
+                $veh->model ?? '',
+                $veh->engine ?? '',
+                $veh->trim ?? '',
+            ], function($part){ return $part !== null && $part !== ''; });
+            $label = trim(implode(' ', $label_parts));
+            if (!empty($veh->plate)) {
+                $label = $label ? $label . ' • ' . $veh->plate : $veh->plate;
+            }
+            if ($label === '') {
+                $label = sprintf(__('Vehicle #%d', 'arm-repair-estimates'), (int)($veh->id ?? 0));
+            }
+            return [
+                'id'      => (int)($veh->id ?? 0),
+                'year'    => $veh->year ?? '',
+                'make'    => $veh->make ?? '',
+                'model'   => $veh->model ?? '',
+                'engine'  => $veh->engine ?? '',
+                'trim'    => $veh->trim ?? '',
+                'vin'     => $veh->vin ?? '',
+                'plate'   => $veh->plate ?? '',
+                'mileage' => $veh->mileage ?? '',
+                'label'   => $label,
+            ];
+        }, $vehicles ?: []);
 
         $action_url = admin_url('admin-post.php');
         $save_nonce = wp_create_nonce('arm_re_save_estimate');
@@ -286,7 +434,106 @@ class Controller {
                 <th><label><?php _e('Customer','arm-repair-estimates'); ?></label></th>
                 <td>
                   <input type="hidden" name="customer_id" id="arm-customer-id" value="<?php echo (int)$estimate->customer_id; ?>">
-                  <input type="text" id="arm-customer-search" class="regular-text" placeholder="<?php esc_attr_e('Search email, phone or name�','arm-repair-estimates'); ?>">
+                  <input type="text" id="arm-customer-search" class="regular-text" placeholder="<?php esc_attr_e('Search email, phone or name','arm-repair-estimates'); ?>">
+            <h2><?php _e('Vehicle','arm-repair-estimates'); ?></h2>
+            <table class="form-table" role="presentation" id="arm-vehicle-fields">
+              <tr>
+                <th><label for="arm-vehicle-select"><?php _e('Select Vehicle','arm-repair-estimates'); ?></label></th>
+                <td>
+                  <select name="vehicle_id" id="arm-vehicle-select" class="regular-text">
+                    <option value="0"><?php _e('Select a vehicle','arm-repair-estimates'); ?></option>
+                    <?php foreach ($vehicles as $veh): ?>
+                      <?php
+                        $parts = array_filter([
+                            $veh->year ?? '',
+                            $veh->make ?? '',
+                            $veh->model ?? '',
+                            $veh->engine ?? '',
+                            $veh->trim ?? '',
+                        ], function($p){ return $p !== '' && $p !== null; });
+                        $label = trim(implode(' ', $parts));
+                        if (!empty($veh->plate)) {
+                            $label = $label ? $label . ' • ' . $veh->plate : $veh->plate;
+                        }
+                      ?>
+                      <option value="<?php echo (int) $veh->id; ?>" <?php selected((int)($estimate->vehicle_id ?? 0), (int)($veh->id ?? 0)); ?>><?php echo esc_html($label ?: sprintf(__('Vehicle #%d','arm-repair-estimates'), (int)($veh->id ?? 0))); ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                  <button type="button" class="button" id="arm-vehicle-add-toggle"><?php _e('Add New Vehicle','arm-repair-estimates'); ?></button>
+                  <?php if (!$estimate->customer_id): ?>
+                    <p class="description"><?php _e('Choose or create a customer to load saved vehicles.','arm-repair-estimates'); ?></p>
+                  <?php endif; ?>
+                  <p class="description"><?php _e('Selecting a saved vehicle fills the fields below. Leave the dropdown on “Select a vehicle” to add a new one for this estimate.','arm-repair-estimates'); ?></p>
+                </td>
+              </tr>
+              <tr>
+                <th><?php _e('Vehicle Details','arm-repair-estimates'); ?></th>
+                <td>
+                  <div id="arm-vehicle-details" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+                    <label><?php _e('Year','arm-repair-estimates'); ?><br><input type="number" name="vehicle_year" value="<?php echo esc_attr($estimate->vehicle_year ?? ''); ?>" class="small-text" min="1900" max="<?php echo esc_attr(date('Y')+1); ?>"></label>
+                    <label><?php _e('Make','arm-repair-estimates'); ?><br><input type="text" name="vehicle_make" value="<?php echo esc_attr($estimate->vehicle_make ?? ''); ?>" class="regular-text"></label>
+                    <label><?php _e('Model','arm-repair-estimates'); ?><br><input type="text" name="vehicle_model" value="<?php echo esc_attr($estimate->vehicle_model ?? ''); ?>" class="regular-text"></label>
+                    <label><?php _e('Engine','arm-repair-estimates'); ?><br><input type="text" name="vehicle_engine" value="<?php echo esc_attr($estimate->vehicle_engine ?? ''); ?>" class="regular-text"></label>
+                    <label><?php _e('Trim','arm-repair-estimates'); ?><br><input type="text" name="vehicle_trim" value="<?php echo esc_attr($estimate->vehicle_trim ?? ''); ?>" class="regular-text"></label>
+                    <label><?php _e('VIN','arm-repair-estimates'); ?><br><input type="text" name="vehicle_vin" value="<?php echo esc_attr($estimate->vehicle_vin ?? ''); ?>" class="regular-text" maxlength="64"></label>
+                    <label><?php _e('License Plate','arm-repair-estimates'); ?><br><input type="text" name="vehicle_plate" value="<?php echo esc_attr($estimate->vehicle_plate ?? ''); ?>" class="regular-text" maxlength="32"></label>
+                    <label><?php _e('Mileage','arm-repair-estimates'); ?><br><input type="text" name="vehicle_mileage" value="<?php echo esc_attr($estimate->vehicle_mileage ?? ''); ?>" class="regular-text"></label>
+                  </div>
+                  <p class="description"><?php _e('Details entered here are saved on the estimate. When no saved vehicle is selected a new vehicle record will be created for the customer on save.','arm-repair-estimates'); ?></p>
+                </td>
+              </tr>
+            </table>
+
+            <h2><?php _e('Vehicle','arm-repair-estimates'); ?></h2>
+            <table class="form-table" role="presentation" id="arm-vehicle-fields">
+              <tr>
+                <th><label for="arm-vehicle-select"><?php _e('Select Vehicle','arm-repair-estimates'); ?></label></th>
+                <td>
+                  <select name="vehicle_id" id="arm-vehicle-select" class="regular-text">
+                    <option value="0"><?php _e('Select a vehicle','arm-repair-estimates'); ?></option>
+                    <?php foreach ($vehicles as $veh): ?>
+                      <?php
+                        $parts = array_filter([
+                            $veh->year ?? '',
+                            $veh->make ?? '',
+                            $veh->model ?? '',
+                            $veh->engine ?? '',
+                            $veh->trim ?? '',
+                        ], function($p){ return $p !== '' && $p !== null; });
+                        $label = trim(implode(' ', $parts));
+                        if (!empty($veh->plate)) {
+                            $label = $label ? $label . ' • ' . $veh->plate : $veh->plate;
+                        }
+                      ?>
+                      <option value="<?php echo (int) $veh->id; ?>" <?php selected((int)($estimate->vehicle_id ?? 0), (int)($veh->id ?? 0)); ?>><?php echo esc_html($label ?: sprintf(__('Vehicle #%d','arm-repair-estimates'), (int)($veh->id ?? 0))); ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                  <button type="button" class="button" id="arm-vehicle-add-toggle"><?php _e('Add New Vehicle','arm-repair-estimates'); ?></button>
+                  <?php if (!$estimate->customer_id): ?>
+                    <p class="description"><?php _e('Choose or create a customer to load saved vehicles.','arm-repair-estimates'); ?></p>
+                  <?php endif; ?>
+                  <p class="description"><?php _e('Selecting a saved vehicle fills the fields below. Leave the dropdown on “Select a vehicle” to add a new one for this estimate.','arm-repair-estimates'); ?></p>
+                </td>
+              </tr>
+              <tr>
+                <th><?php _e('Vehicle Details','arm-repair-estimates'); ?></th>
+                <td>
+                  <div id="arm-vehicle-details" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+                    <label><?php _e('Year','arm-repair-estimates'); ?><br><input type="number" name="vehicle_year" value="<?php echo esc_attr($estimate->vehicle_year ?? ''); ?>" class="small-text" min="1900" max="<?php echo esc_attr(date('Y')+1); ?>"></label>
+                    <label><?php _e('Make','arm-repair-estimates'); ?><br><input type="text" name="vehicle_make" value="<?php echo esc_attr($estimate->vehicle_make ?? ''); ?>" class="regular-text"></label>
+                    <label><?php _e('Model','arm-repair-estimates'); ?><br><input type="text" name="vehicle_model" value="<?php echo esc_attr($estimate->vehicle_model ?? ''); ?>" class="regular-text"></label>
+                    <label><?php _e('Engine','arm-repair-estimates'); ?><br><input type="text" name="vehicle_engine" value="<?php echo esc_attr($estimate->vehicle_engine ?? ''); ?>" class="regular-text"></label>
+                    <label><?php _e('Trim','arm-repair-estimates'); ?><br><input type="text" name="vehicle_trim" value="<?php echo esc_attr($estimate->vehicle_trim ?? ''); ?>" class="regular-text"></label>
+                    <label><?php _e('VIN','arm-repair-estimates'); ?><br><input type="text" name="vehicle_vin" value="<?php echo esc_attr($estimate->vehicle_vin ?? ''); ?>" class="regular-text" maxlength="64"></label>
+                    <label><?php _e('License Plate','arm-repair-estimates'); ?><br><input type="text" name="vehicle_plate" value="<?php echo esc_attr($estimate->vehicle_plate ?? ''); ?>" class="regular-text" maxlength="32"></label>
+                    <label><?php _e('Mileage','arm-repair-estimates'); ?><br><input type="text" name="vehicle_mileage" value="<?php echo esc_attr($estimate->vehicle_mileage ?? ''); ?>" class="regular-text"></label>
+                  </div>
+                  <p class="description"><?php _e('Details entered here are saved on the estimate. When no saved vehicle is selected a new vehicle record will be created for the customer on save.','arm-repair-estimates'); ?></p>
+                </td>
+              </tr>
+            </table>
+
+','arm-repair-estimates'); ?>">
                   <button type="button" class="button" id="arm-customer-search-btn"><?php _e('Search','arm-repair-estimates'); ?></button>
                   <div id="arm-customer-results" class="description" style="margin-top:6px;"></div>
                   <p class="description"><?php _e('Pick an existing customer or leave blank to create a new one using the fields below.','arm-repair-estimates'); ?></p>
@@ -337,10 +584,127 @@ class Controller {
                 <td>
                   <label><?php _e('Miles:','arm-repair-estimates'); ?> <input type="number" step="0.01" name="mileage_miles" id="arm-mileage-miles" value="<?php echo esc_attr($estimate->mileage_miles); ?>" class="small-text"></label>
                   &nbsp;
-                  <label><?php _e('Rate/mi:','arm-repair-estimates'); ?> <input type="number" step="0.01" name="mileage_rate" id="arm-mileage-rate" value="<?php echo esc_attr($estimate->mileage_rate); ?>" class="small-text"></label>
-                  &nbsp;
-                  <label><?php _e('Total:','arm-repair-estimates'); ?> <input type="text" readonly id="arm-mileage-total" value="<?php echo esc_attr(number_format((float)$estimate->mileage_total,2)); ?>" class="small-text"></label>
-                </td>
+        <?php $ajax_nonce = wp_create_nonce('arm_re_est_admin'); ?>
+          var vehicleData = <?php echo wp_json_encode($vehicle_js); ?>;
+          var initialVehicleId = <?php echo (int)($estimate->vehicle_id ?? 0); ?>;
+          var $vehicleSelect = $('#arm-vehicle-select');
+          var vehicleLabels = {
+            selectPrompt: '<?php echo esc_js(__('Select a vehicle','arm-repair-estimates')); ?>',
+            fallback: '<?php echo esc_js(__('Vehicle #','arm-repair-estimates')); ?>'
+          };
+          var vehicleInputs = {
+            year: $('input[name="vehicle_year"]'),
+            make: $('input[name="vehicle_make"]'),
+            model: $('input[name="vehicle_model"]'),
+            engine: $('input[name="vehicle_engine"]'),
+            trim: $('input[name="vehicle_trim"]'),
+            vin: $('input[name="vehicle_vin"]'),
+            plate: $('input[name="vehicle_plate"]'),
+            mileage: $('input[name="vehicle_mileage"]')
+          };
+
+          function buildVehicleOptions(selectedId){
+            selectedId = parseInt(selectedId || 0, 10);
+            $vehicleSelect.empty();
+            $('<option>').val('0').text(vehicleLabels.selectPrompt).appendTo($vehicleSelect);
+            if (Array.isArray(vehicleData)) {
+              vehicleData.forEach(function(v){
+                if (!v) return;
+                var id = parseInt(v.id || 0, 10);
+                var label = v.label || (vehicleLabels.fallback + id);
+                var $opt = $('<option>').val(id).text(label);
+                if (id === selectedId) {
+                  $opt.prop('selected', true);
+                }
+                $vehicleSelect.append($opt);
+              });
+            }
+          }
+
+          function fillVehicleFields(v){
+            vehicleInputs.year.val(v && v.year ? v.year : '');
+            vehicleInputs.make.val(v && v.make ? v.make : '');
+            vehicleInputs.model.val(v && v.model ? v.model : '');
+            vehicleInputs.engine.val(v && v.engine ? v.engine : '');
+            vehicleInputs.trim.val(v && v.trim ? v.trim : '');
+            vehicleInputs.vin.val(v && v.vin ? v.vin : '');
+            vehicleInputs.plate.val(v && v.plate ? v.plate : '');
+            vehicleInputs.mileage.val(v && v.mileage ? v.mileage : '');
+          }
+
+          function clearVehicleFields(){
+            fillVehicleFields(null);
+          }
+
+          function getVehicleById(id){
+            id = parseInt(id || 0, 10);
+            if (!Array.isArray(vehicleData)) return null;
+            for (var i = 0; i < vehicleData.length; i++) {
+              var v = vehicleData[i];
+              if (parseInt((v && v.id) || 0, 10) === id) {
+                return v;
+              }
+            }
+            return null;
+          }
+
+          function syncVehicleFieldsById(id){
+            var v = getVehicleById(id);
+            if (v) {
+              fillVehicleFields(v);
+            } else if (!id || parseInt(id, 10) === 0) {
+              clearVehicleFields();
+            }
+          }
+
+          function loadVehicles(customerId){
+            customerId = parseInt(customerId || 0, 10);
+            if (!customerId) {
+              vehicleData = [];
+              buildVehicleOptions(0);
+              clearVehicleFields();
+              return;
+            }
+            $.post(ajaxurl, {
+              action: 'arm_re_customer_vehicles',
+              _ajax_nonce: '<?php echo esc_js($ajax_nonce); ?>',
+              customer_id: customerId
+            }, function(res){
+              if (res && res.success && Array.isArray(res.data)) {
+                vehicleData = res.data;
+              } else {
+                vehicleData = [];
+              }
+              buildVehicleOptions($vehicleSelect.val());
+              syncVehicleFieldsById($vehicleSelect.val());
+            });
+          }
+
+          buildVehicleOptions(initialVehicleId);
+          syncVehicleFieldsById(initialVehicleId);
+
+          $vehicleSelect.on('change', function(){
+            syncVehicleFieldsById($(this).val());
+          });
+
+          $('#arm-vehicle-add-toggle').on('click', function(e){
+            e.preventDefault();
+            $vehicleSelect.val('0');
+            clearVehicleFields();
+            vehicleInputs.year.focus();
+          });
+
+            $('#arm-customer-results').text('<?php echo esc_js(__('Searching','arm-repair-estimates')); ?>');
+            $.post(ajaxurl, { action:'arm_re_search_customers', _ajax_nonce:'<?php echo esc_js($ajax_nonce); ?>', q:q }, function(res){
+                var $a = $('<a href="#" class="button" style="margin:0 6px 6px 0;"></a>').text('#'+r.id+' '+r.name+'  '+r.email);
+                  $vehicleSelect.val('0');
+                  clearVehicleFields();
+                  loadVehicles(r.id);
+          // If a customer is already selected (editing), keep options synced after load
+          <?php if ($estimate->customer_id): ?>
+            loadVehicles('<?php echo (int) $estimate->customer_id; ?>');
+          <?php endif; ?>
+
               </tr>
               <tr><th><?php _e('Tax Rate (%)'); ?></th><td><input type="number" step="0.01" name="tax_rate" id="arm-tax-rate" value="<?php echo esc_attr($estimate->tax_rate); ?>"></td></tr>
               <tr><th><?php _e('Subtotal'); ?></th><td><input type="text" readonly id="arm-subtotal" value="<?php echo esc_attr(number_format((float)$estimate->subtotal,2)); ?>"></td></tr>
@@ -390,7 +754,7 @@ class Controller {
           $('#arm-customer-search-btn').on('click', function(){
             var q = $('#arm-customer-search').val();
             if (!q) return;
-            $('#arm-customer-results').text('<?php echo esc_js(__('Searching�','arm-repair-estimates')); ?>');
+            $('#arm-customer-results').text('<?php echo esc_js(__('Searching','arm-repair-estimates')); ?>');
             $.post(ajaxurl, { action:'arm_re_search_customers', _ajax_nonce:'<?php echo wp_create_nonce('arm_re_est_admin'); ?>', q:q }, function(res){
               var $out = $('#arm-customer-results').empty();
               if (!res || !res.success || !res.data || !res.data.length) {
@@ -398,7 +762,7 @@ class Controller {
                 return;
               }
               res.data.forEach(function(r){
-                var $a = $('<a href="#" class="button" style="margin:0 6px 6px 0;"></a>').text('#'+r.id+' '+r.name+' � '+r.email);
+                var $a = $('<a href="#" class="button" style="margin:0 6px 6px 0;"></a>').text('#'+r.id+' '+r.name+'  '+r.email);
                 $a.on('click', function(e){ e.preventDefault();
                   $('#arm-customer-id').val(r.id);
                   // Fill fields
@@ -508,6 +872,66 @@ class Controller {
         return '<tr>
           <td><select name="jobs[__JOB_INDEX__][items][__ROW_INDEX__][type]" class="arm-it-type">'.$opts.'</select></td>
           <td><input type="text" name="jobs[__JOB_INDEX__][items][__ROW_INDEX__][desc]" class="widefat"></td>
+        $tblV = $wpdb->prefix.'arm_vehicles';
+        $vehicle_id     = (int) ($_POST['vehicle_id'] ?? 0);
+        $vehicle_year   = isset($_POST['vehicle_year']) ? (int) $_POST['vehicle_year'] : 0;
+        $vehicle_make   = sanitize_text_field($_POST['vehicle_make'] ?? '');
+        $vehicle_model  = sanitize_text_field($_POST['vehicle_model'] ?? '');
+        $vehicle_engine = sanitize_text_field($_POST['vehicle_engine'] ?? '');
+        $vehicle_trim   = sanitize_text_field($_POST['vehicle_trim'] ?? '');
+        $vehicle_vin    = sanitize_text_field($_POST['vehicle_vin'] ?? '');
+        $vehicle_plate  = sanitize_text_field($_POST['vehicle_plate'] ?? '');
+        $vehicle_mileage= sanitize_text_field($_POST['vehicle_mileage'] ?? '');
+
+        $vehicle_year_db    = $vehicle_year > 0 ? $vehicle_year : null;
+        $vehicle_make_db    = $vehicle_make !== '' ? $vehicle_make : null;
+        $vehicle_model_db   = $vehicle_model !== '' ? $vehicle_model : null;
+        $vehicle_engine_db  = $vehicle_engine !== '' ? $vehicle_engine : null;
+        $vehicle_trim_db    = $vehicle_trim !== '' ? $vehicle_trim : null;
+        $vehicle_vin_db     = $vehicle_vin !== '' ? $vehicle_vin : null;
+        $vehicle_plate_db   = $vehicle_plate !== '' ? $vehicle_plate : null;
+        $vehicle_mileage_db = $vehicle_mileage !== '' ? $vehicle_mileage : null;
+        $vehicle_data_provided = ($vehicle_year_db !== null) || $vehicle_make_db || $vehicle_model_db || $vehicle_engine_db || $vehicle_trim_db || $vehicle_vin_db || $vehicle_plate_db || $vehicle_mileage_db;
+
+        $vehicle_columns = [];
+        $vehicle_table_exists = ($wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $tblV)) === $tblV);
+        if ($vehicle_table_exists) {
+            $vehicle_columns = $wpdb->get_col("SHOW COLUMNS FROM $tblV");
+        } else {
+            $vehicle_id = 0;
+        }
+
+        if ($vehicle_table_exists) {
+            if (!$vehicle_id && $vehicle_data_provided) {
+                if ($vehicle_make_db === null || $vehicle_model_db === null) {
+                    wp_die(__('Vehicle make and model are required when adding a new vehicle.','arm-repair-estimates'));
+                }
+                $vehicle_insert = [];
+                if (in_array('customer_id', $vehicle_columns, true)) $vehicle_insert['customer_id'] = $customer_id;
+                if (in_array('year', $vehicle_columns, true))        $vehicle_insert['year']        = $vehicle_year_db;
+                if (in_array('make', $vehicle_columns, true))        $vehicle_insert['make']        = $vehicle_make_db;
+                if (in_array('model', $vehicle_columns, true))       $vehicle_insert['model']       = $vehicle_model_db;
+                if (in_array('engine', $vehicle_columns, true))      $vehicle_insert['engine']      = $vehicle_engine_db;
+                if (in_array('trim', $vehicle_columns, true))        $vehicle_insert['trim']        = $vehicle_trim_db;
+                if (in_array('vin', $vehicle_columns, true))         $vehicle_insert['vin']         = $vehicle_vin_db;
+                if (in_array('plate', $vehicle_columns, true))       $vehicle_insert['plate']       = $vehicle_plate_db;
+                if (in_array('mileage', $vehicle_columns, true))     $vehicle_insert['mileage']     = $vehicle_mileage_db;
+                if (in_array('created_at', $vehicle_columns, true))  $vehicle_insert['created_at']  = current_time('mysql');
+                if (in_array('updated_at', $vehicle_columns, true))  $vehicle_insert['updated_at']  = current_time('mysql');
+                if (!empty($vehicle_insert)) {
+                    $wpdb->insert($tblV, $vehicle_insert);
+                    $vehicle_id = (int) $wpdb->insert_id;
+                }
+            } elseif ($vehicle_id) {
+                $vehicle_row = $wpdb->get_row($wpdb->prepare("SELECT customer_id FROM $tblV WHERE id=%d", $vehicle_id));
+                if (!$vehicle_row || (((int) ($vehicle_row->customer_id ?? 0)) !== 0 && (int) $vehicle_row->customer_id !== $customer_id)) {
+                    $vehicle_id = 0;
+                }
+            }
+        }
+
+        $vehicle_id = $vehicle_id ?: 0;
+
           <td><input type="number" step="0.01" name="jobs[__JOB_INDEX__][items][__ROW_INDEX__][qty]" value="1" class="small-text arm-it-qty"></td>
           <td><input type="number" step="0.01" name="jobs[__JOB_INDEX__][items][__ROW_INDEX__][price]" value="0.00" class="regular-text arm-it-price"></td>
           <td><input type="checkbox" name="jobs[__JOB_INDEX__][items][__ROW_INDEX__][taxable]" value="1" checked class="arm-it-taxable"></td>
@@ -601,6 +1025,15 @@ class Controller {
                 $desc = sanitize_text_field($row['desc'] ?? '');
                 if ($desc === '') continue;
                 $type = in_array($row['type'] ?? 'LABOR', ['LABOR','PART','FEE','DISCOUNT'], true) ? $row['type'] : 'LABOR';
+            'vehicle_id'=> $vehicle_id ?: null,
+            'vehicle_year'=> $vehicle_year_db,
+            'vehicle_make'=> $vehicle_make_db,
+            'vehicle_model'=> $vehicle_model_db,
+            'vehicle_engine'=> $vehicle_engine_db,
+            'vehicle_trim'=> $vehicle_trim_db,
+            'vehicle_vin'=> $vehicle_vin_db,
+            'vehicle_plate'=> $vehicle_plate_db,
+            'vehicle_mileage'=> $vehicle_mileage_db,
                 $qty  = (float) ($row['qty'] ?? 1);
                 $price= (float) ($row['price'] ?? 0);
                 $tax  = !empty($row['taxable']) ? 1 : 0;
@@ -742,6 +1175,38 @@ class Controller {
         $id = intval($_GET['id'] ?? 0);
         $status = in_array($_GET['status'] ?? '', ['APPROVED','DECLINED','EXPIRED'], true) ? $_GET['status'] : '';
         if (!$status) wp_die('Invalid status');
+    public static function ajax_customer_vehicles() {
+        if (!current_user_can('manage_options')) wp_send_json_error();
+        check_ajax_referer('arm_re_est_admin');
+        $customer_id = (int) ($_POST['customer_id'] ?? 0);
+        if (!$customer_id) {
+            wp_send_json_success([]);
+        }
+        global $wpdb;
+        $tbl = $wpdb->prefix.'arm_vehicles';
+        $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $tbl WHERE customer_id=%d ORDER BY year DESC, make ASC, model ASC", $customer_id), ARRAY_A);
+        if (!$rows) {
+            wp_send_json_success([]);
+        }
+        $payload = array_map(function($row){
+            $parts = array_filter([
+                $row['year'] ?? '',
+                $row['make'] ?? '',
+                $row['model'] ?? '',
+                $row['engine'] ?? '',
+                $row['trim'] ?? '',
+            ], function($p){ return $p !== '' && $p !== null; });
+            $label = trim(implode(' ', $parts));
+            if (!empty($row['plate'])) {
+                $label = $label ? $label . ' • ' . $row['plate'] : $row['plate'];
+            }
+            $row['label'] = $label !== '' ? $label : sprintf(__('Vehicle #%d','arm-repair-estimates'), (int)($row['id'] ?? 0));
+            return $row;
+        }, $rows);
+        wp_send_json_success($payload);
+    }
+
+
         $tblE = $wpdb->prefix.'arm_estimates';
         $wpdb->update($tblE, ['status'=>$status,'updated_at'=>current_time('mysql')], ['id'=>$id]);
         wp_redirect(admin_url('admin.php?page=arm-repair-estimates-builder&action=edit&id='.$id.'&marked=1'));

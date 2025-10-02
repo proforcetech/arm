@@ -22,6 +22,22 @@ class PublicView {
         echo '<div class="arm-invoice-view">';
         echo '<h1>'.esc_html(sprintf(__('Invoice %s','arm-repair-estimates'), $inv->invoice_no)).'</h1>';
         echo '<p><strong>'.esc_html($cust->first_name.' '.$cust->last_name).'</strong> &lt;'.esc_html($cust->email).'&gt;</p>';
+        $vehicle_parts = array_filter([
+            $inv->vehicle_year ?? '',
+            $inv->vehicle_make ?? '',
+            $inv->vehicle_model ?? '',
+            $inv->vehicle_engine ?? '',
+            $inv->vehicle_trim ?? '',
+        ], function($part){ return $part !== null && $part !== ''; });
+        $vehicle_summary = trim(implode(' ', $vehicle_parts));
+        if ($vehicle_summary || !empty($inv->vehicle_plate) || !empty($inv->vehicle_vin) || !empty($inv->vehicle_mileage)) {
+            echo '<p><strong>'.esc_html__('Vehicle','arm-repair-estimates').'</strong><br>';
+            if ($vehicle_summary) { echo esc_html($vehicle_summary).'<br>'; }
+            if (!empty($inv->vehicle_plate)) { echo esc_html__('License Plate','arm-repair-estimates').': '.esc_html($inv->vehicle_plate).'<br>'; }
+            if (!empty($inv->vehicle_vin)) { echo esc_html__('VIN','arm-repair-estimates').': '.esc_html($inv->vehicle_vin).'<br>'; }
+            if (!empty($inv->vehicle_mileage)) { echo esc_html__('Mileage','arm-repair-estimates').': '.esc_html($inv->vehicle_mileage).'<br>'; }
+            echo '</p>';
+        }
         echo '<table class="widefat"><thead><tr><th>'.__('Type').'</th><th>'.__('Description').'</th><th>'.__('Qty').'</th><th>'.__('Unit').'</th><th>'.__('Total').'</th></tr></thead><tbody>';
         foreach ($items as $it) {
             echo '<tr><td>'.esc_html($it->item_type).'</td><td>'.esc_html($it->description).'</td><td>'.esc_html($it->qty).'</td><td>'.esc_html(number_format((float)$it->unit_price,2)).'</td><td>'.esc_html(number_format((float)$it->line_total,2)).'</td></tr>';
