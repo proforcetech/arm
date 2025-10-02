@@ -14,6 +14,16 @@ class SchemaFix {
         self::ensurePrimaryKey($wpdb->prefix . 'arm_customers', 'id');
         self::ensurePrimaryKey($wpdb->prefix . 'arm_appointments', 'id');
 
+        // Customer profile extensions
+        $custTable = $wpdb->prefix . 'arm_customers';
+        self::ensureColumn($custTable, 'business_name', "VARCHAR(200) NULL AFTER phone");
+        self::ensureColumn($custTable, 'tax_id', "VARCHAR(100) NULL AFTER business_name");
+        self::ensureColumn($custTable, 'billing_address1', "VARCHAR(200) NULL AFTER zip");
+        self::ensureColumn($custTable, 'billing_address2', "VARCHAR(200) NULL AFTER billing_address1");
+        self::ensureColumn($custTable, 'billing_city', "VARCHAR(100) NULL AFTER billing_address2");
+        self::ensureColumn($custTable, 'billing_state', "VARCHAR(100) NULL AFTER billing_city");
+        self::ensureColumn($custTable, 'billing_zip', "VARCHAR(20) NULL AFTER billing_state");
+
         // 2) Fix the availability column definitions (remove inline comments & trailing commas)
         self::modifyColumn(
             $wpdb->prefix . 'arm_availability',
@@ -26,7 +36,7 @@ class SchemaFix {
             "DATE NULL COMMENT 'for holiday single day'"
         );
 
-        // 3) Add well-named indexes (replaces any “ADD COLUMN INDEX(...)” logic)
+        // 3) Add well-named indexes (replaces any ADD COLUMN INDEX(...) logic)
         self::addIndex($wpdb->prefix . 'arm_estimates', 'idx_arm_estimates_customer_id', ['customer_id']);
         self::addIndex($wpdb->prefix . 'arm_estimates', 'idx_arm_estimates_request_id', ['request_id']);
 
@@ -61,6 +71,23 @@ class SchemaFix {
         if (!$hasPk) {
             // Only add a PK if it doesn't exist
             $wpdb->query("ALTER TABLE `$table` ADD PRIMARY KEY (`$column`)");
+        }
+    }
+
+    private static function ensureColumn(string $table, string $column, string $definition): void {
+        global $wpdb;
+        $exists = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA=DATABASE()
+                   AND TABLE_NAME=%s
+                   AND COLUMN_NAME=%s
+                 LIMIT 1",
+                $table, $column
+            )
+        );
+        if (!$exists) {
+            $wpdb->query("ALTER TABLE `$table` ADD COLUMN `$column` $definition");
         }
     }
 
