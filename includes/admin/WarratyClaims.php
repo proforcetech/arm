@@ -9,19 +9,16 @@ if (!defined('ABSPATH')) exit;
  */
 final class WarrantyClaims {
     public static function boot(): void {
-        add_action('admin_menu', [__CLASS__, 'menu']);
     }
 
-    public static function menu(): void {
-        add_submenu_page(
-            'arm-repair-estimates',
-            __('Warranty Claims','arm-repair-estimates'),
-            __('Warranty Claims','arm-repair-estimates'),
-            'manage_options',
-            'arm-warranty-claims',
-            [__CLASS__, 'render_admin'],
-            60
-        );
+    public static function menu_page(): array {
+        return [
+            'page_title' => __('Warranty Claims','arm-repair-estimates'),
+            'menu_title' => __('Warranty Claims','arm-repair-estimates'),
+            'capability' => 'manage_options',
+            'menu_slug'  => 'arm-warranty-claims',
+            'callback'   => [__CLASS__, 'render_admin'],
+        ];
     }
 
     public static function render_admin(): void {
