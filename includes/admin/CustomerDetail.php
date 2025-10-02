@@ -25,37 +25,63 @@ class CustomerDetail {
 
         // Handle vehicle add
         if (!empty($_POST['arm_add_vehicle_nonce']) && wp_verify_nonce($_POST['arm_add_vehicle_nonce'], 'arm_add_vehicle')) {
+            $now = current_time('mysql');
             $data = [
                 'customer_id' => $customer_id,
                 'year'        => intval($_POST['year']),
-                'make'        => sanitize_text_field($_POST['make']),
-                'model'       => sanitize_text_field($_POST['model']),
-                'engine'      => sanitize_text_field($_POST['engine']),
-                'trim'        => sanitize_text_field($_POST['trim']),
-                'created_at'  => current_time('mysql'),
+                'make'        => self::clean_text($_POST['make'] ?? '', 120),
+                'model'       => self::clean_text($_POST['model'] ?? '', 120),
+                'engine'      => self::clean_text($_POST['engine'] ?? '', 150),
+                'trim'        => self::clean_text($_POST['trim'] ?? '', 120),
+                'drive'       => self::clean_text($_POST['drive'] ?? '', 60),
+                'vin'         => self::clean_text($_POST['vin'] ?? '', 32),
+                'license_plate' => self::clean_text($_POST['license_plate'] ?? '', 32),
+                'current_mileage' => self::normalize_mileage($_POST['current_mileage'] ?? ''),
+                'previous_service_mileage' => self::normalize_mileage($_POST['previous_service_mileage'] ?? ''),
+                'created_at'  => $now,
+                'updated_at'  => $now,
             ];
-            $wpdb->insert($tbl_veh, $data);
-            echo '<div class="updated"><p>Vehicle added successfully.</p></div>';
+            if ($data['year'] <= 0 || empty($data['make']) || empty($data['model'])) {
+                echo '<div class="notice notice-error"><p>Year, make, and model are required.</p></div>';
+            } else {
+                $wpdb->insert($tbl_veh, $data);
+                echo '<div class="updated"><p>Vehicle added successfully.</p></div>';
+            }
         }
 
         // Handle CSV import
         if (!empty($_POST['arm_import_csv_nonce']) && wp_verify_nonce($_POST['arm_import_csv_nonce'], 'arm_import_csv') && !empty($_FILES['csv_file']['tmp_name'])) {
             $handle = fopen($_FILES['csv_file']['tmp_name'], 'r');
             if ($handle) {
-                $row = 0; $imported = 0;
+                $row = 0; $imported = 0; $cols = [];
                 while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
                     $row++;
-                    if ($row === 1) continue; // skip header
-                    [$year, $make, $model, $engine, $trim] = array_pad($data, 5, '');
-                    if (!$year || !$make || !$model) continue; // minimal required
+                    if ($row === 1) {
+                        $cols = array_map(function($c){ return strtolower(trim($c)); }, $data);
+                        continue;
+                    }
+                    if (!$cols) { continue; }
+                    $mapped = self::map_vehicle_row($cols, $data);
+                    if (!$mapped) { continue; }
+                    $year  = intval($mapped['year']);
+                    $make  = $mapped['make'] ?? '';
+                    $model = $mapped['model'] ?? '';
+                    if ($year <= 0 || $make === '' || $model === '') continue;
+                    $now = current_time('mysql');
                     $wpdb->insert($tbl_veh, [
                         'customer_id' => $customer_id,
-                        'year'        => intval($year),
-                        'make'        => sanitize_text_field($make),
-                        'model'       => sanitize_text_field($model),
-                        'engine'      => sanitize_text_field($engine),
-                        'trim'        => sanitize_text_field($trim),
-                        'created_at'  => current_time('mysql'),
+                        'year'        => $year,
+                        'make'        => $make,
+                        'model'       => $model,
+                        'engine'      => $mapped['engine'],
+                        'trim'        => $mapped['trim'],
+                        'drive'       => $mapped['drive'],
+                        'vin'         => $mapped['vin'],
+                        'license_plate' => $mapped['license_plate'],
+                        'current_mileage' => $mapped['current_mileage'],
+                        'previous_service_mileage' => $mapped['previous_service_mileage'],
+                        'created_at'  => $now,
+                        'updated_at'  => $now,
                     ]);
                     $imported++;
                 }
@@ -69,7 +95,7 @@ class CustomerDetail {
         // Handle CSV export
         if (!empty($_GET['arm_export_csv']) && check_admin_referer('arm_export_csv_'.$customer_id)) {
             $vehicles = $wpdb->get_results($wpdb->prepare(
-                "SELECT year, make, model, engine, trim FROM $tbl_veh WHERE customer_id=%d ORDER BY year DESC, make ASC, model ASC",
+                "SELECT year, make, model, trim, engine, drive, vin, license_plate, current_mileage, previous_service_mileage FROM $tbl_veh WHERE customer_id=%d AND (deleted_at IS NULL) ORDER BY year DESC, make ASC, model ASC",
                 $customer_id
             ), ARRAY_A);
 
@@ -77,7 +103,7 @@ class CustomerDetail {
                 header('Content-Type: text/csv');
                 header('Content-Disposition: attachment; filename="customer_'.$customer_id.'_vehicles.csv"');
                 $out = fopen('php://output', 'w');
-                fputcsv($out, ['year','make','model','engine','trim']);
+                fputcsv($out, ['year','make','model','trim','engine','drive','vin','license_plate','current_mileage','previous_service_mileage']);
                 foreach ($vehicles as $row) {
                     fputcsv($out, $row);
                 }
@@ -121,8 +147,13 @@ class CustomerDetail {
                 <tr><th>Year</th><td><input type="number" name="year" required></td></tr>
                 <tr><th>Make</th><td><input type="text" name="make" required></td></tr>
                 <tr><th>Model</th><td><input type="text" name="model" required></td></tr>
-                <tr><th>Engine</th><td><input type="text" name="engine"></td></tr>
                 <tr><th>Trim</th><td><input type="text" name="trim"></td></tr>
+                <tr><th>Engine</th><td><input type="text" name="engine"></td></tr>
+                <tr><th>Drive</th><td><input type="text" name="drive"></td></tr>
+                <tr><th>VIN</th><td><input type="text" name="vin"></td></tr>
+                <tr><th>License Plate</th><td><input type="text" name="license_plate"></td></tr>
+                <tr><th>Current Mileage</th><td><input type="number" name="current_mileage" min="0" step="1"></td></tr>
+                <tr><th>Previous Service Mileage</th><td><input type="number" name="previous_service_mileage" min="0" step="1"></td></tr>
               </table>';
         submit_button('Add Vehicle');
         echo '</form>';
@@ -133,24 +164,29 @@ class CustomerDetail {
         wp_nonce_field('arm_import_csv', 'arm_import_csv_nonce');
         echo '<input type="file" name="csv_file" accept=".csv" required> ';
         submit_button('Upload & Import CSV');
-        echo '<p class="description">CSV format: year, make, model, engine, trim</p>';
+        echo '<p class="description">CSV format: year, make, model, trim, engine, drive, vin, license_plate, current_mileage, previous_service_mileage</p>';
         echo '</form>';
 
         // Existing vehicles table
         $vehicles = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM $tbl_veh WHERE customer_id=%d ORDER BY year DESC, make ASC, model ASC",
+            "SELECT * FROM $tbl_veh WHERE customer_id=%d AND (deleted_at IS NULL) ORDER BY year DESC, make ASC, model ASC",
             $customer_id
         ));
         if ($vehicles) {
-            echo '<table class="widefat striped"><thead><tr><th>Year</th><th>Make</th><th>Model</th><th>Engine</th><th>Trim</th><th>Actions</th></tr></thead><tbody>';
+            echo '<table class="widefat striped"><thead><tr><th>Year</th><th>Make</th><th>Model</th><th>Trim</th><th>Engine</th><th>Drive</th><th>VIN</th><th>License Plate</th><th>Current Mileage</th><th>Previous Service Mileage</th><th>Actions</th></tr></thead><tbody>';
             foreach ($vehicles as $v) {
                 $reuse_url = admin_url('admin.php?page=arm-repair-estimates-builder&action=new&customer_id='.$customer->id.'&vehicle_id='.$v->id);
                 echo '<tr>
                         <td>'.esc_html($v->year).'</td>
                         <td>'.esc_html($v->make).'</td>
                         <td>'.esc_html($v->model).'</td>
-                        <td>'.esc_html($v->engine).'</td>
                         <td>'.esc_html($v->trim).'</td>
+                        <td>'.esc_html($v->engine).'</td>
+                        <td>'.esc_html($v->drive).'</td>
+                        <td>'.esc_html($v->vin).'</td>
+                        <td>'.esc_html($v->license_plate).'</td>
+                        <td>'.esc_html($v->current_mileage).'</td>
+                        <td>'.esc_html($v->previous_service_mileage).'</td>
                         <td><a href="'.esc_url($reuse_url).'" class="button">Use in New Estimate</a></td>
                       </tr>';
             }
@@ -163,5 +199,62 @@ class CustomerDetail {
         // [Code for Estimates and Invoices as in previous version]
 
         echo '</div>'; // .wrap
+    }
+    private static function clean_text($value, int $maxLength = 191) {
+        $value = sanitize_text_field((string) ($value ?? ''));
+        $value = trim($value);
+        if ($value === '') {
+            return null;
+        }
+        if (function_exists('mb_substr')) {
+            return mb_substr($value, 0, $maxLength);
+        }
+        return substr($value, 0, $maxLength);
+    }
+
+    private static function normalize_mileage($value) {
+        $value = trim((string) ($value ?? ''));
+        if ($value === '') {
+            return null;
+        }
+        $numeric = preg_replace('/[^0-9]/', '', $value);
+        if ($numeric === '') {
+            return null;
+        }
+        return (int) $numeric;
+    }
+
+    private static function map_vehicle_row(array $cols, array $row) {
+        $lookup = [];
+        foreach ($cols as $index => $name) {
+            $lookup[$name] = $index;
+        }
+
+        $get = function(string $key) use ($lookup, $row) {
+            if (!isset($lookup[$key])) {
+                return '';
+            }
+            $value = $row[$lookup[$key]] ?? '';
+            return is_string($value) ? $value : (string) $value;
+        };
+
+        $data = [
+            'year'        => (int) $get('year'),
+            'make'        => self::clean_text($get('make'), 120),
+            'model'       => self::clean_text($get('model'), 120),
+            'trim'        => self::clean_text($get('trim'), 120),
+            'engine'      => self::clean_text($get('engine'), 150),
+            'drive'       => self::clean_text($get('drive'), 60),
+            'vin'         => self::clean_text($get('vin'), 32),
+            'license_plate' => self::clean_text($get('license_plate'), 32),
+            'current_mileage' => self::normalize_mileage($get('current_mileage')),
+            'previous_service_mileage' => self::normalize_mileage($get('previous_service_mileage')),
+        ];
+
+        if (!$data['year'] && empty($data['make']) && empty($data['model'])) {
+            return null;
+        }
+
+        return $data;
     }
 }

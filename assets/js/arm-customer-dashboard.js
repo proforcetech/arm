@@ -17,15 +17,23 @@ jQuery(document).ready(function ($) {
 
     /** ===== Vehicles: Edit ===== */
     $(".arm-edit-vehicle").on("click", function () {
-        var row = $(this).closest("tr");
-        var id = $(this).data("id");
+        var btn = $(this);
+        var formWrap = $("#arm-vehicle-form");
+        var form = formWrap.find("form");
+        form[0].reset();
 
-        $("#arm-vehicle-form").show();
-        $("#arm-vehicle-form input[name=id]").val(id);
-        $("#arm-vehicle-form input[name=year]").val(row.find("td").eq(0).text());
-        $("#arm-vehicle-form input[name=make]").val(row.find("td").eq(1).text());
-        $("#arm-vehicle-form input[name=model]").val(row.find("td").eq(2).text());
-        // engine/trim not in table -> left blank
+        formWrap.show();
+        form.find("input[name=id]").val(btn.data("id") || "");
+        form.find("input[name=year]").val(btn.data("year") || "");
+        form.find("input[name=make]").val(btn.data("make") || "");
+        form.find("input[name=model]").val(btn.data("model") || "");
+        form.find("input[name=trim]").val(btn.data("trim") || "");
+        form.find("input[name=engine]").val(btn.data("engine") || "");
+        form.find("input[name=drive]").val(btn.data("drive") || "");
+        form.find("input[name=vin]").val(btn.data("vin") || "");
+        form.find("input[name=license_plate]").val(btn.data("license_plate") || "");
+        form.find("input[name=current_mileage]").val(btn.data("current_mileage") || "");
+        form.find("input[name=previous_service_mileage]").val(btn.data("previous_service_mileage") || "");
     });
 
     /** ===== Vehicles: Delete ===== */
