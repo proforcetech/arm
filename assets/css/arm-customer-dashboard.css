@@ -4,6 +4,77 @@
   margin: 20px 0;
 }
 
+.arm-dashboard__header {
+  margin-bottom: 15px;
+}
+
+.arm-dashboard__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: #555;
+  margin: 5px 0 0;
+}
+
+.arm-dashboard__impersonation {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: #fff3cd;
+  border: 1px solid #f7d070;
+  border-radius: 4px;
+  color: #7f6000;
+  font-weight: 600;
+}
+
+.arm-dashboard__empty {
+  margin-bottom: 20px;
+  padding: 15px 18px;
+  border-radius: 4px;
+  background: #f0f6ff;
+  border: 1px solid #c8d7f1;
+  color: #1d4ed8;
+}
+
+.arm-dashboard__notice {
+  padding: 12px 15px;
+  background: #fff4e5;
+  border: 1px solid #f5c27f;
+  border-radius: 4px;
+  color: #7a4b00;
+}
+
+.arm-dashboard__empty-section {
+  color: #666;
+  font-style: italic;
+}
+
+.arm-dashboard__list {
+  list-style: none;
+  padding: 0;
+  margin: 15px 0;
+}
+
+.arm-dashboard__list li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 15px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  background: #fff;
+}
+
+.arm-dashboard__list a {
+  font-weight: 600;
+  color: #0a66c2;
+}
+
+.arm-dashboard__total {
+  color: #4b5563;
+  font-size: 13px;
+}
+
 .arm-tabs {
   display: flex;
   gap: 10px;
@@ -49,6 +120,10 @@
   width: 100%;
   border-collapse: collapse;
   margin-bottom: 20px;
+}
+
+.arm-dashboard__table {
+  overflow-x: auto;
 }
 
 .arm-tab th,
@@ -109,28 +184,47 @@
 }
 
 /* === Forms === */
-#arm-vehicle-form {
+.arm-dashboard__form {
   border: 1px solid #ddd;
-  padding: 15px;
-  margin-bottom: 20px;
+  padding: 18px;
+  margin-top: 20px;
   background: #fafafa;
   border-radius: 4px;
 }
 
-#arm-vehicle-form table {
-  margin-bottom: 10px;
+.arm-dashboard__form label {
+  display: block;
+  margin-bottom: 12px;
 }
 
-#arm-vehicle-form input[type="text"],
-#arm-vehicle-form input[type="number"] {
+.arm-dashboard__form span {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.arm-dashboard__form input[type="text"],
+.arm-dashboard__form input[type="number"],
+.arm-dashboard__form textarea {
   width: 100%;
-  padding: 6px;
+  padding: 8px;
   border: 1px solid #ccc;
-  border-radius: 3px;
+  border-radius: 4px;
+  font-size: 14px;
 }
 
-#arm-vehicle-form button {
-  margin-top: 10px;
+.arm-dashboard__form textarea {
+  resize: vertical;
+}
+
+.arm-dashboard__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.arm-required {
+  color: #d63638;
+  margin-left: 4px;
 }
 
 /* === Profile Section === */

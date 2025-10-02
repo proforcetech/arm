@@ -31,6 +31,7 @@ add_action('plugins_loaded', function () {
     ARM\Public\Assets::boot();
     ARM\Public\Shortcode_Form::boot();
     ARM\Public\Ajax_Submit::boot();
+    ARM\Public\Customer_Dashboard::boot();
 
     ARM\Estimates\Controller::boot();
     ARM\Estimates\PublicView::boot();
