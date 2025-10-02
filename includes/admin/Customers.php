@@ -11,6 +11,7 @@ final class Customers {
     public static function boot(): void {
         // Menu
         \add_action('admin_menu', [__CLASS__, 'menu']);
+        \add_action('admin_menu', [__CLASS__, 'register_detail_page']);
 
         // Handlers
         \add_action('admin_post_arm_re_customer_save',         [__CLASS__, 'handle_save']);
@@ -31,6 +32,20 @@ final class Customers {
             'manage_options',
             'arm-repair-customers',
             [__CLASS__, 'render_admin']
+        );
+    }
+
+    public static function register_detail_page(): void {
+        \add_submenu_page(
+            null,
+            __('Customer Details', 'arm-repair-estimates'),
+            __('Customer Details', 'arm-repair-estimates'),
+            'manage_options',
+            'arm-customer-detail',
+            function () {
+                $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+                CustomerDetail::render($id);
+            }
         );
     }
 
@@ -135,15 +150,16 @@ final class Customers {
             foreach ($rows as $r) {
                 $name = trim(($r->first_name ?? '') . ' ' . ($r->last_name ?? ''));
                 $addr = trim(($r->address ?? '') . ( ($r->city ?? '') ? ', '.$r->city : '' ) . ( ($r->state ?? '') ? ', '.$r->state : '' ) . ( ($r->zip ?? '') ? ' '.$r->zip : '' ));
+                $detail = \admin_url('admin.php?page=arm-customer-detail&id='.(int)$r->id);
                 $edit = \admin_url('admin.php?page=arm-repair-customers&action=edit&id='.(int)$r->id);
                 $del  = \wp_nonce_url(\admin_url('admin-post.php?action=arm_re_customer_delete&id='.(int)$r->id), 'arm_re_customer_delete');
                 echo '<tr>';
-                echo '<td>'.esc_html($name ?: '—').'</td>';
-                echo '<td>'.esc_html($r->email ?: '—').'</td>';
-                echo '<td>'.esc_html($r->phone ?: '—').'</td>';
-                echo '<td>'.esc_html($addr ?: '—').'</td>';
+                echo '<td>'.esc_html($name ?: '').'</td>';
+                echo '<td>'.esc_html($r->email ?: '').'</td>';
+                echo '<td>'.esc_html($r->phone ?: '').'</td>';
+                echo '<td>'.esc_html($addr ?: '').'</td>';
                 echo '<td>'.esc_html($r->created_at ?: '').'</td>';
-                echo '<td><a href="'.esc_url($edit).'">'.esc_html__('Edit', 'arm-repair-estimates').'</a> | '
+                echo '<td><a href="'.esc_url($detail).'">'.esc_html__('Details', 'arm-repair-estimates').'</a> | <a href="'.esc_url($edit).'">'.esc_html__('Edit', 'arm-repair-estimates').'</a> | '
                    . '<a href="'.esc_url($del).'" onclick="return confirm(\''.esc_js(__('Delete this customer?', 'arm-repair-estimates')).'\');">'.esc_html__('Delete', 'arm-repair-estimates').'</a></td>';
                 echo '</tr>';
             }
@@ -189,12 +205,20 @@ final class Customers {
         echo '<table class="form-table" role="presentation">';
         echo '<tr><th>'.esc_html__('First Name', 'arm-repair-estimates').'</th><td><input type="text" name="first_name" value="'.esc_attr($row->first_name ?? '').'" class="regular-text" required></td></tr>';
         echo '<tr><th>'.esc_html__('Last Name', 'arm-repair-estimates').'</th><td><input type="text" name="last_name" value="'.esc_attr($row->last_name ?? '').'" class="regular-text" required></td></tr>';
+        echo '<tr><th>'.esc_html__('Business Name', 'arm-repair-estimates').'</th><td><input type="text" name="business_name" value="'.esc_attr($row->business_name ?? '').'" class="regular-text"></td></tr>';
+        echo '<tr><th>'.esc_html__('Tax ID', 'arm-repair-estimates').'</th><td><input type="text" name="tax_id" value="'.esc_attr($row->tax_id ?? '').'" class="regular-text"></td></tr>';
         echo '<tr><th>'.esc_html__('Email', 'arm-repair-estimates').'</th><td><input type="email" name="email" value="'.esc_attr($row->email ?? '').'" class="regular-text" required></td></tr>';
         echo '<tr><th>'.esc_html__('Phone', 'arm-repair-estimates').'</th><td><input type="text" name="phone" value="'.esc_attr($row->phone ?? '').'" class="regular-text"></td></tr>';
         echo '<tr><th>'.esc_html__('Address', 'arm-repair-estimates').'</th><td><input type="text" name="address" value="'.esc_attr($row->address ?? '').'" class="regular-text"></td></tr>';
         echo '<tr><th>'.esc_html__('City', 'arm-repair-estimates').'</th><td><input type="text" name="city" value="'.esc_attr($row->city ?? '').'" class="regular-text"></td></tr>';
         echo '<tr><th>'.esc_html__('State', 'arm-repair-estimates').'</th><td><input type="text" name="state" value="'.esc_attr($row->state ?? '').'" class="regular-text"></td></tr>';
         echo '<tr><th>'.esc_html__('Zip', 'arm-repair-estimates').'</th><td><input type="text" name="zip" value="'.esc_attr($row->zip ?? '').'" class="regular-text"></td></tr>';
+        echo '<tr><th>'.esc_html__('Billing Address Line 1', 'arm-repair-estimates').'</th><td><input type="text" name="billing_address1" value="'.esc_attr($row->billing_address1 ?? '').'" class="regular-text"></td></tr>';
+        echo '<tr><th>'.esc_html__('Billing Address Line 2', 'arm-repair-estimates').'</th><td><input type="text" name="billing_address2" value="'.esc_attr($row->billing_address2 ?? '').'" class="regular-text"></td></tr>';
+        echo '<tr><th>'.esc_html__('Billing City', 'arm-repair-estimates').'</th><td><input type="text" name="billing_city" value="'.esc_attr($row->billing_city ?? '').'" class="regular-text"></td></tr>';
+        echo '<tr><th>'.esc_html__('Billing State', 'arm-repair-estimates').'</th><td><input type="text" name="billing_state" value="'.esc_attr($row->billing_state ?? '').'" class="regular-text"></td></tr>';
+        echo '<tr><th>'.esc_html__('Billing Zip', 'arm-repair-estimates').'</th><td><input type="text" name="billing_zip" value="'.esc_attr($row->billing_zip ?? '').'" class="regular-text"></td></tr>';
+        echo '<tr><th>'.esc_html__('Tax Exempt', 'arm-repair-estimates').'</th><td><label><input type="checkbox" name="tax_exempt" value="1" '.(!empty($row->tax_exempt) ? 'checked' : '').'> '.esc_html__('Mark customer as tax exempt', 'arm-repair-estimates').'</label></td></tr>';
         echo '<tr><th>'.esc_html__('Notes', 'arm-repair-estimates').'</th><td><textarea name="notes" rows="4" class="large-text">'.esc_textarea($row->notes ?? '').'</textarea></td></tr>';
         echo '</table>';
 
@@ -243,16 +267,24 @@ final class Customers {
 
         $id = (int)($_POST['id'] ?? 0);
         $data = [
-            'first_name' => \sanitize_text_field($_POST['first_name'] ?? ''),
-            'last_name'  => \sanitize_text_field($_POST['last_name'] ?? ''),
-            'email'      => \sanitize_email($_POST['email'] ?? ''),
-            'phone'      => \sanitize_text_field($_POST['phone'] ?? ''),
-            'address'    => \sanitize_text_field($_POST['address'] ?? ''),
-            'city'       => \sanitize_text_field($_POST['city'] ?? ''),
-            'state'      => \sanitize_text_field($_POST['state'] ?? ''),
-            'zip'        => \sanitize_text_field($_POST['zip'] ?? ''),
-            'notes'      => \sanitize_textarea_field($_POST['notes'] ?? ''),
-            'updated_at' => \current_time('mysql'),
+            'first_name'       => \sanitize_text_field($_POST['first_name'] ?? ''),
+            'last_name'        => \sanitize_text_field($_POST['last_name'] ?? ''),
+            'business_name'    => \sanitize_text_field($_POST['business_name'] ?? ''),
+            'tax_id'           => \sanitize_text_field($_POST['tax_id'] ?? ''),
+            'email'            => \sanitize_email($_POST['email'] ?? ''),
+            'phone'            => \sanitize_text_field($_POST['phone'] ?? ''),
+            'address'          => \sanitize_text_field($_POST['address'] ?? ''),
+            'city'             => \sanitize_text_field($_POST['city'] ?? ''),
+            'state'            => \sanitize_text_field($_POST['state'] ?? ''),
+            'zip'              => \sanitize_text_field($_POST['zip'] ?? ''),
+            'billing_address1' => \sanitize_text_field($_POST['billing_address1'] ?? ''),
+            'billing_address2' => \sanitize_text_field($_POST['billing_address2'] ?? ''),
+            'billing_city'     => \sanitize_text_field($_POST['billing_city'] ?? ''),
+            'billing_state'    => \sanitize_text_field($_POST['billing_state'] ?? ''),
+            'billing_zip'      => \sanitize_text_field($_POST['billing_zip'] ?? ''),
+            'tax_exempt'       => !empty($_POST['tax_exempt']) ? 1 : 0,
+            'notes'            => \sanitize_textarea_field($_POST['notes'] ?? ''),
+            'updated_at'       => \current_time('mysql'),
         ];
 
         if (!$data['email']) {
@@ -442,7 +474,7 @@ final class Customers {
         foreach ($rows as $r) {
             $label = trim("{$r->first_name} {$r->last_name}");
             $label = $label ?: $r->email;
-            if ($r->phone) $label .= " — {$r->phone}";
+            if ($r->phone) $label .= "  {$r->phone}";
             $out[] = [
                 'id'    => (int)$r->id,
                 'label' => $label,

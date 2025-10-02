@@ -16,7 +16,7 @@ final class Activator {
         // Make sure dbDelta is available.
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
-        // If constants/files aren’t available yet (defensive), define/require them.
+        // If constants/files arent available yet (defensive), define/require them.
         if (!defined('ARM_RE_PATH')) {
             define('ARM_RE_PATH', plugin_dir_path(dirname(__FILE__, 2)));
         }
@@ -35,10 +35,17 @@ final class Activator {
           last_name VARCHAR(100) NOT NULL,
           email VARCHAR(200) NOT NULL,
           phone VARCHAR(50) NULL,
+          business_name VARCHAR(200) NULL,
+          tax_id VARCHAR(100) NULL,
           address VARCHAR(200) NULL,
           city VARCHAR(100) NULL,
           state VARCHAR(100) NULL,
           zip VARCHAR(20) NULL,
+          billing_address1 VARCHAR(200) NULL,
+          billing_address2 VARCHAR(200) NULL,
+          billing_city VARCHAR(100) NULL,
+          billing_state VARCHAR(100) NULL,
+          billing_zip VARCHAR(20) NULL,
           notes TEXT NULL,
           tax_exempt TINYINT(1) NOT NULL DEFAULT 0,
           created_at DATETIME NOT NULL,

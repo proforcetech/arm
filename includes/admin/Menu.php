@@ -35,20 +35,6 @@ class Menu {
 	add_submenu_page('arm-repair-estimates', __('Dashboard','arm-repair-estimates'), __('Dashboard','arm-repair-estimates'),
 	    'manage_options', 'arm-dashboard', ['ARM\\Admin\\Dashboard','render_dashboard']);
 
-add_submenu_page(
-    'arm-repair-estimates',
-    __('Customer Detail','arm-repair-estimates'),
-    __('Customer Detail','arm-repair-estimates'),
-    'manage_options',
-    'arm-customer-detail',
-    function() {
-        $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
-        \ARM\Admin\CustomerDetail::render($id);
-    }
-);
-
-
-
         // Invoices, Bundles submenus are registered in their own Controllers
     }
 
