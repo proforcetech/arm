@@ -52,6 +52,25 @@ $currency          = strtoupper(get_option('arm_re_currency','usd'));
       <?php if (!empty($cust->city) || !empty($cust->zip)): ?><div><?php echo esc_html(trim("{$cust->city} {$cust->zip}")); ?></div><?php endif; ?>
       <?php if (!empty($cust->phone)): ?><div><?php echo esc_html($cust->phone); ?></div><?php endif; ?>
       <?php if (!empty($cust->email)): ?><div><?php echo esc_html($cust->email); ?></div><?php endif; ?>
+      <?php
+        $invoice_vehicle_parts = array_filter([
+            $inv->vehicle_year ?? '',
+            $inv->vehicle_make ?? '',
+            $inv->vehicle_model ?? '',
+            $inv->vehicle_engine ?? '',
+            $inv->vehicle_trim ?? '',
+        ], function($part){ return $part !== null && $part !== ''; });
+        $invoice_vehicle_summary = trim(implode(' ', $invoice_vehicle_parts));
+      ?>
+      <?php if ($invoice_vehicle_summary || !empty($inv->vehicle_plate) || !empty($inv->vehicle_vin) || !empty($inv->vehicle_mileage)): ?>
+        <div style="margin-top:8px;">
+          <strong><?php _e('Vehicle','arm-repair-estimates'); ?>:</strong>
+          <?php if ($invoice_vehicle_summary): ?><div><?php echo esc_html($invoice_vehicle_summary); ?></div><?php endif; ?>
+          <?php if (!empty($inv->vehicle_plate)): ?><div><?php _e('License Plate','arm-repair-estimates'); ?>: <?php echo esc_html($inv->vehicle_plate); ?></div><?php endif; ?>
+          <?php if (!empty($inv->vehicle_vin)): ?><div><?php _e('VIN','arm-repair-estimates'); ?>: <?php echo esc_html($inv->vehicle_vin); ?></div><?php endif; ?>
+          <?php if (!empty($inv->vehicle_mileage)): ?><div><?php _e('Mileage','arm-repair-estimates'); ?>: <?php echo esc_html($inv->vehicle_mileage); ?></div><?php endif; ?>
+        </div>
+      <?php endif; ?>
     </div>
     <div style="text-align:right;display:flex;flex-direction:column;gap:10px;align-items:flex-end;">
       <a class="button" href="<?php echo esc_url($pdf_url); ?>"><?php _e('Download PDF','arm-repair-estimates'); ?></a>

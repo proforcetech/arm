@@ -9,6 +9,8 @@ class Controller {
      * Boot hooks (submenu, actions, public view)
      * --------------------------------------------------------------*/
     public static function boot() {
+        self::maybe_upgrade_schema();
+
         // Admin UI
         add_action('admin_menu', function () {
             add_submenu_page(
@@ -29,6 +31,33 @@ class Controller {
         add_action('template_redirect', [__CLASS__, 'render_public_if_requested']);
     }
 
+    private static function maybe_upgrade_schema(): void {
+        global $wpdb;
+        $table = $wpdb->prefix . 'arm_invoices';
+        $has_vehicle_id = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = 'vehicle_id'",
+                $table
+            )
+        );
+        if ($has_vehicle_id) {
+            return;
+        }
+        $wpdb->query(
+            "ALTER TABLE `$table`
+                ADD COLUMN vehicle_id BIGINT UNSIGNED NULL AFTER customer_id,
+                ADD COLUMN vehicle_year SMALLINT UNSIGNED NULL AFTER vehicle_id,
+                ADD COLUMN vehicle_make VARCHAR(80) NULL AFTER vehicle_year,
+                ADD COLUMN vehicle_model VARCHAR(120) NULL AFTER vehicle_make,
+                ADD COLUMN vehicle_engine VARCHAR(120) NULL AFTER vehicle_model,
+                ADD COLUMN vehicle_trim VARCHAR(120) NULL AFTER vehicle_engine,
+                ADD COLUMN vehicle_vin VARCHAR(64) NULL AFTER vehicle_trim,
+                ADD COLUMN vehicle_plate VARCHAR(32) NULL AFTER vehicle_vin,
+                ADD COLUMN vehicle_mileage VARCHAR(32) NULL AFTER vehicle_plate,
+                ADD KEY idx_arm_invoices_vehicle_id (vehicle_id)"
+        );
+    }
+
     /** --------------------------------------------------------------
      * DB tables for invoices and items
      * --------------------------------------------------------------*/
@@ -42,6 +71,15 @@ class Controller {
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             estimate_id BIGINT UNSIGNED NULL,
             customer_id BIGINT UNSIGNED NOT NULL,
+            vehicle_id BIGINT UNSIGNED NULL,
+            vehicle_year SMALLINT UNSIGNED NULL,
+            vehicle_make VARCHAR(80) NULL,
+            vehicle_model VARCHAR(120) NULL,
+            vehicle_engine VARCHAR(120) NULL,
+            vehicle_trim VARCHAR(120) NULL,
+            vehicle_vin VARCHAR(64) NULL,
+            vehicle_plate VARCHAR(32) NULL,
+            vehicle_mileage VARCHAR(32) NULL,
             invoice_no VARCHAR(32) NOT NULL,
             status ENUM('UNPAID','PAID','VOID') NOT NULL DEFAULT 'UNPAID',
             subtotal DECIMAL(12,2) NOT NULL DEFAULT 0,
@@ -55,6 +93,7 @@ class Controller {
             UNIQUE KEY invoice_no (invoice_no),
             UNIQUE KEY token (token),
             INDEX(customer_id), INDEX(estimate_id),
+            INDEX(vehicle_id),
             PRIMARY KEY(id)
         ) $charset;");
 
@@ -109,17 +148,26 @@ class Controller {
 
         // Create invoice shell
         $wpdb->insert($invT, [
-            'estimate_id' => $e->id,
-            'customer_id' => $e->customer_id,
-            'invoice_no'  => self::next_invoice_no(),
-            'status'      => 'UNPAID',
-            'subtotal'    => $e->subtotal,
-            'tax_rate'    => $e->tax_rate,
-            'tax_amount'  => $e->tax_amount,
-            'total'       => $e->total,
-            'notes'       => $e->notes,
-            'token'       => self::token(),
-            'created_at'  => current_time('mysql'),
+            'estimate_id'    => $e->id,
+            'customer_id'    => $e->customer_id,
+            'vehicle_id'     => $e->vehicle_id ?: null,
+            'vehicle_year'   => $e->vehicle_year ?: null,
+            'vehicle_make'   => $e->vehicle_make ?: null,
+            'vehicle_model'  => $e->vehicle_model ?: null,
+            'vehicle_engine' => $e->vehicle_engine ?: null,
+            'vehicle_trim'   => $e->vehicle_trim ?: null,
+            'vehicle_vin'    => $e->vehicle_vin ?: null,
+            'vehicle_plate'  => $e->vehicle_plate ?: null,
+            'vehicle_mileage'=> $e->vehicle_mileage ?: null,
+            'invoice_no'     => self::next_invoice_no(),
+            'status'         => 'UNPAID',
+            'subtotal'       => $e->subtotal,
+            'tax_rate'       => $e->tax_rate,
+            'tax_amount'     => $e->tax_amount,
+            'total'          => $e->total,
+            'notes'          => $e->notes,
+            'token'          => self::token(),
+            'created_at'     => current_time('mysql'),
         ]);
         $inv_id = (int)$wpdb->insert_id;
 
