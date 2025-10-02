@@ -6,6 +6,10 @@ if (!defined('ABSPATH')) exit;
 class CustomerDetail {
 
     public static function render($customer_id) {
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+
         global $wpdb;
 
         $tbl_cust = $wpdb->prefix . 'arm_customers';

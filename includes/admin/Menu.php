@@ -3,14 +3,20 @@ namespace ARM\Admin;
 if (!defined('ABSPATH')) exit;
 
 class Menu {
+    /**
+     * Hook into WordPress.
+     */
     public static function boot() {
         add_action('admin_menu', [__CLASS__, 'register']);
     }
 
+    /**
+     * Register the top level menu + all submenus in one place.
+     */
     public static function register() {
         add_menu_page(
-            __('Repair Estimates','arm-repair-estimates'),
-            __('Repair Estimates','arm-repair-estimates'),
+            __('Repair Estimates', 'arm-repair-estimates'),
+            __('Repair Estimates', 'arm-repair-estimates'),
             'manage_options',
             'arm-repair-estimates',
             [__CLASS__, 'render_requests_page'],
@@ -18,38 +24,110 @@ class Menu {
             27
         );
 
-        add_submenu_page('arm-repair-estimates', __('Vehicle Data','arm-repair-estimates'), __('Vehicle Data','arm-repair-estimates'),
-            'manage_options','arm-repair-vehicles',[Vehicles::class,'render']);
+        $parent = 'arm-repair-estimates';
 
-        add_submenu_page('arm-repair-estimates', __('Service Types','arm-repair-estimates'), __('Service Types','arm-repair-estimates'),
-            'manage_options','arm-repair-services',[Services::class,'render']);
+        $visible = self::ordered_visible_submenus();
+        foreach ($visible as $page) {
+            self::add_submenu($parent, $page);
+        }
 
-        add_submenu_page('arm-repair-estimates', __('Settings','arm-repair-estimates'), __('Settings','arm-repair-estimates'),
-            'manage_options','arm-repair-settings',[Settings::class,'render']);
-
-        // Estimates UI provided by Estimates\Controller
-        add_submenu_page('arm-repair-estimates', __('Estimates','arm-repair-estimates'), __('Estimates','arm-repair-estimates'),
-            'manage_options','arm-repair-estimates-builder',['ARM\\Estimates\\Controller','render_admin']);
-
-    // Corrected the callback to point to the Dashboard class
-	add_submenu_page('arm-repair-estimates', __('Dashboard','arm-repair-estimates'), __('Dashboard','arm-repair-estimates'),
-	    'manage_options', 'arm-dashboard', ['ARM\\Admin\\Dashboard','render_dashboard']);
-
-add_submenu_page(
-    'arm-repair-estimates',
-    __('Customer Detail','arm-repair-estimates'),
-    __('Customer Detail','arm-repair-estimates'),
-    'manage_options',
-    'arm-customer-detail',
-    function() {
-        $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
-        \ARM\Admin\CustomerDetail::render($id);
+        $hidden = self::hidden_submenus();
+        foreach ($hidden as $page) {
+            self::add_submenu($parent, $page);
+        }
     }
-);
 
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private static function ordered_visible_submenus(): array {
+        $dashboard = Dashboard::menu_page();
 
+        $primary = array_filter([
+            \ARM\Appointments\Admin::menu_page(),
+            Customers::menu_page(),
+            \ARM\Estimates\Controller::menu_page(),
+            \ARM\Invoices\Controller::menu_page(),
+            Inventory::menu_page(),
+            \ARM\Bundles\Controller::menu_page(),
+            Services::menu_page(),
+            Settings::menu_page(),
+        ]);
 
-        // Invoices, Bundles submenus are registered in their own Controllers
+        $primary = array_map(function ($page) {
+            return array_merge([
+                'parent_slug' => 'arm-repair-estimates',
+            ], $page);
+        }, $primary);
+
+        usort($primary, static function ($a, $b) {
+            return strcasecmp($a['menu_title'] ?? '', $b['menu_title'] ?? '');
+        });
+
+        $others = array_filter([
+            \ARM\Appointments\Admin::availability_menu_page(),
+            WarrantyClaims::menu_page(),
+            [
+                'page_title' => __('Vehicle Data', 'arm-repair-estimates'),
+                'menu_title' => __('Vehicle Data', 'arm-repair-estimates'),
+                'capability' => 'manage_options',
+                'menu_slug'  => 'arm-repair-vehicles',
+                'callback'   => [Vehicles::class, 'render'],
+            ],
+        ]);
+
+        usort($others, static function ($a, $b) {
+            return strcasecmp($a['menu_title'] ?? '', $b['menu_title'] ?? '');
+        });
+
+        $visible = array_merge([
+            array_merge(['parent_slug' => 'arm-repair-estimates'], $dashboard),
+        ], $primary, $others);
+
+        foreach ($visible as $index => &$page) {
+            if (!isset($page['position'])) {
+                $page['position'] = $index + 1;
+            }
+        }
+        unset($page);
+
+        return $visible;
+    }
+
+    /**
+     * Hidden submenu pages (blank menu title but routable).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private static function hidden_submenus(): array {
+        return array_filter([
+            Customers::customer_detail_menu(),
+        ]);
+    }
+
+    /**
+     * Helper wrapper for add_submenu_page to enforce consistent keys.
+     */
+    private static function add_submenu(string $parent, array $args): void {
+        $defaults = [
+            'parent_slug' => $parent,
+            'page_title'  => '',
+            'menu_title'  => '',
+            'capability'  => 'manage_options',
+            'menu_slug'   => '',
+            'callback'    => null,
+        ];
+        $page = array_merge($defaults, $args);
+
+        add_submenu_page(
+            $page['parent_slug'],
+            $page['page_title'],
+            $page['menu_title'],
+            $page['capability'],
+            $page['menu_slug'],
+            $page['callback'],
+            $page['position'] ?? null
+        );
     }
 
     // Simple list of requests (migrated later if desired)

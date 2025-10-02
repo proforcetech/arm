@@ -5,6 +5,16 @@ if (!defined('ABSPATH')) exit;
 class Services {
     public static function boot() {}
 
+    public static function menu_page(): array {
+        return [
+            'page_title' => __('Service Types','arm-repair-estimates'),
+            'menu_title' => __('Service Types','arm-repair-estimates'),
+            'capability' => 'manage_options',
+            'menu_slug'  => 'arm-repair-services',
+            'callback'   => [__CLASS__, 'render'],
+        ];
+    }
+
     public static function render() {
         if (!current_user_can('manage_options')) return;
         global $wpdb; $tbl = $wpdb->prefix.'arm_service_types';

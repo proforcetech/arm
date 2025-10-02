@@ -7,6 +7,16 @@ class Settings {
         add_action('admin_init', [__CLASS__, 'register']);
     }
 
+    public static function menu_page(): array {
+        return [
+            'page_title' => __('Settings', 'arm-repair-estimates'),
+            'menu_title' => __('Settings', 'arm-repair-estimates'),
+            'capability' => 'manage_options',
+            'menu_slug'  => 'arm-repair-settings',
+            'callback'   => [__CLASS__, 'render'],
+        ];
+    }
+
     public static function register() {
         register_setting('arm_re_settings', 'arm_re_terms_html',  ['type'=>'string','sanitize_callback'=>'wp_kses_post']);
         register_setting('arm_re_settings', 'arm_re_notify_email',['type'=>'string','sanitize_callback'=>'sanitize_email']);
@@ -76,7 +86,7 @@ class Settings {
         
         ?>
         <div class="wrap">
-          <h1><?php _e('ARM Repair Estimates — Settings','arm-repair-estimates'); ?></h1>
+          <h1><?php _e('ARM Repair Estimates â€” Settings','arm-repair-estimates'); ?></h1>
           <form method="post" action="options.php">
             <?php settings_fields('arm_re_settings'); ?>
             <table class="form-table" role="presentation">

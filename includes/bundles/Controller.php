@@ -9,20 +9,18 @@ class Controller {
      * Boot hooks
      * --------------------------------------------------------------*/
     public static function boot() {
-        // Admin UI
-        add_action('admin_menu', function () {
-            add_submenu_page(
-                'arm-repair-estimates',
-                __('Preset Bundles','arm-repair-estimates'),
-                __('Preset Bundles','arm-repair-estimates'),
-                'manage_options',
-                'arm-repair-bundles',
-                [__CLASS__, 'render_admin']
-            );
-        });
-
         // AJAX: fetch bundle items for the estimate builder
         add_action('wp_ajax_arm_re_get_bundle_items', [__CLASS__, 'ajax_get_bundle_items']);
+    }
+
+    public static function menu_page(): array {
+        return [
+            'page_title' => __('Preset Bundles','arm-repair-estimates'),
+            'menu_title' => __('Preset Bundles','arm-repair-estimates'),
+            'capability' => 'manage_options',
+            'menu_slug'  => 'arm-repair-bundles',
+            'callback'   => [__CLASS__, 'render_admin'],
+        ];
     }
 
     /** --------------------------------------------------------------
@@ -146,7 +144,7 @@ class Controller {
                 <th><label for="arm_bndl_service_type"><?php _e('Service Type (optional)','arm-repair-estimates'); ?></label></th>
                 <td>
                   <select id="arm_bndl_service_type" name="service_type_id">
-                    <option value=""><?php _e('— none —','arm-repair-estimates'); ?></option>
+                    <option value=""><?php _e('â€” none â€”','arm-repair-estimates'); ?></option>
                     <?php foreach ($services as $s): ?>
                       <option value="<?php echo (int)$s->id; ?>"><?php echo esc_html($s->name); ?></option>
                     <?php endforeach; ?>
@@ -187,7 +185,7 @@ class Controller {
           <h2><?php _e('Existing Bundles','arm-repair-estimates'); ?></h2>
           <ul>
             <?php foreach ($bundles as $b): ?>
-              <li>#<?php echo (int)$b->id; ?> — <?php echo esc_html($b->name); ?> (<?php echo $b->is_active ? esc_html__('Active','arm-repair-estimates') : esc_html__('Inactive','arm-repair-estimates'); ?>)</li>
+              <li>#<?php echo (int)$b->id; ?> â€” <?php echo esc_html($b->name); ?> (<?php echo $b->is_active ? esc_html__('Active','arm-repair-estimates') : esc_html__('Inactive','arm-repair-estimates'); ?>)</li>
             <?php endforeach; ?>
           </ul>
         </div>

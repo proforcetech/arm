@@ -9,9 +9,6 @@ if (!defined('ABSPATH')) exit;
 final class Customers {
 
     public static function boot(): void {
-        // Menu
-        \add_action('admin_menu', [__CLASS__, 'menu']);
-
         // Handlers
         \add_action('admin_post_arm_re_customer_save',         [__CLASS__, 'handle_save']);
         \add_action('admin_post_arm_re_customer_delete',       [__CLASS__, 'handle_delete']);
@@ -22,16 +19,33 @@ final class Customers {
         \add_action('wp_ajax_arm_re_customer_search',          [__CLASS__, 'ajax_search']);
     }
 
-    /** Add submenu under main plugin menu */
-    public static function menu(): void {
-        \add_submenu_page(
-            'arm-repair-estimates',
-            __('Customers', 'arm-repair-estimates'),
-            __('Customers', 'arm-repair-estimates'),
-            'manage_options',
-            'arm-repair-customers',
-            [__CLASS__, 'render_admin']
-        );
+    public static function menu_page(): array {
+        return [
+            'page_title' => __('Customers', 'arm-repair-estimates'),
+            'menu_title' => __('Customers', 'arm-repair-estimates'),
+            'capability' => 'manage_options',
+            'menu_slug'  => 'arm-repair-customers',
+            'callback'   => [__CLASS__, 'render_admin'],
+        ];
+    }
+
+    public static function customer_detail_menu(): array {
+        return [
+            'page_title' => __('Customer Detail', 'arm-repair-estimates'),
+            'menu_title' => '',
+            'capability' => 'manage_options',
+            'menu_slug'  => 'arm-customer-detail',
+            'callback'   => [__CLASS__, 'render_customer_detail'],
+        ];
+    }
+
+    public static function render_customer_detail(): void {
+        if (!\current_user_can('manage_options')) {
+            return;
+        }
+
+        $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+        CustomerDetail::render($id);
     }
 
     /** Admin screen router */
@@ -138,10 +152,10 @@ final class Customers {
                 $edit = \admin_url('admin.php?page=arm-repair-customers&action=edit&id='.(int)$r->id);
                 $del  = \wp_nonce_url(\admin_url('admin-post.php?action=arm_re_customer_delete&id='.(int)$r->id), 'arm_re_customer_delete');
                 echo '<tr>';
-                echo '<td>'.esc_html($name ?: '—').'</td>';
-                echo '<td>'.esc_html($r->email ?: '—').'</td>';
-                echo '<td>'.esc_html($r->phone ?: '—').'</td>';
-                echo '<td>'.esc_html($addr ?: '—').'</td>';
+                echo '<td>'.esc_html($name ?: 'â€”').'</td>';
+                echo '<td>'.esc_html($r->email ?: 'â€”').'</td>';
+                echo '<td>'.esc_html($r->phone ?: 'â€”').'</td>';
+                echo '<td>'.esc_html($addr ?: 'â€”').'</td>';
                 echo '<td>'.esc_html($r->created_at ?: '').'</td>';
                 echo '<td><a href="'.esc_url($edit).'">'.esc_html__('Edit', 'arm-repair-estimates').'</a> | '
                    . '<a href="'.esc_url($del).'" onclick="return confirm(\''.esc_js(__('Delete this customer?', 'arm-repair-estimates')).'\');">'.esc_html__('Delete', 'arm-repair-estimates').'</a></td>';
@@ -442,7 +456,7 @@ final class Customers {
         foreach ($rows as $r) {
             $label = trim("{$r->first_name} {$r->last_name}");
             $label = $label ?: $r->email;
-            if ($r->phone) $label .= " — {$r->phone}";
+            if ($r->phone) $label .= " â€” {$r->phone}";
             $out[] = [
                 'id'    => (int)$r->id,
                 'label' => $label,

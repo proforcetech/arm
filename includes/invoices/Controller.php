@@ -9,24 +9,22 @@ class Controller {
      * Boot hooks (submenu, actions, public view)
      * --------------------------------------------------------------*/
     public static function boot() {
-        // Admin UI
-        add_action('admin_menu', function () {
-            add_submenu_page(
-                'arm-repair-estimates',
-                __('Invoices', 'arm-repair-estimates'),
-                __('Invoices', 'arm-repair-estimates'),
-                'manage_options',
-                'arm-repair-invoices',
-                [__CLASS__, 'render_admin']
-            );
-        });
-
         // Convert from Estimate action
         add_action('admin_post_arm_re_convert_estimate_to_invoice', [__CLASS__, 'convert_from_estimate']);
 
         // Public viewing via token
         add_filter('query_vars', function ($vars) { $vars[] = 'arm_invoice'; return $vars; });
         add_action('template_redirect', [__CLASS__, 'render_public_if_requested']);
+    }
+
+    public static function menu_page(): array {
+        return [
+            'page_title' => __('Invoices', 'arm-repair-estimates'),
+            'menu_title' => __('Invoices', 'arm-repair-estimates'),
+            'capability' => 'manage_options',
+            'menu_slug'  => 'arm-repair-invoices',
+            'callback'   => [__CLASS__, 'render_admin'],
+        ];
     }
 
     /** --------------------------------------------------------------

@@ -12,22 +12,19 @@ final class Inventory
 {
     public static function boot(): void
     {
-        add_action('admin_menu', [__CLASS__, 'menu']);
         add_action('admin_post_arm_inventory_save', [__CLASS__, 'handle_save']);
         add_action('admin_post_arm_inventory_delete', [__CLASS__, 'handle_delete']);
     }
 
-    public static function menu(): void
+    public static function menu_page(): array
     {
-        add_submenu_page(
-            'arm-repair-estimates',
-            __('Inventory', 'arm-repair-estimates'),
-            __('Inventory', 'arm-repair-estimates'),
-            'manage_options',
-            'arm-inventory',
-            [__CLASS__, 'render_router'],
-            20
-        );
+        return [
+            'page_title' => __('Inventory', 'arm-repair-estimates'),
+            'menu_title' => __('Inventory', 'arm-repair-estimates'),
+            'capability' => 'manage_options',
+            'menu_slug'  => 'arm-inventory',
+            'callback'   => [__CLASS__, 'render_router'],
+        ];
     }
 
     /** Simple action router: list | add | edit */

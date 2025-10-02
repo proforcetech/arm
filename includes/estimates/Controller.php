@@ -20,6 +20,16 @@ class Controller {
         // Public view & actions booted in PublicView class
     }
 
+    public static function menu_page(): array {
+        return [
+            'page_title' => __('Estimates','arm-repair-estimates'),
+            'menu_title' => __('Estimates','arm-repair-estimates'),
+            'capability' => 'manage_options',
+            'menu_slug'  => 'arm-repair-estimates-builder',
+            'callback'   => [__CLASS__, 'render_admin'],
+        ];
+    }
+
     /** ----------------------------------------------------------------
      * DB install/upgrade for estimates, items, jobs, customers, signatures
      * -----------------------------------------------------------------*/
@@ -286,7 +296,7 @@ class Controller {
                 <th><label><?php _e('Customer','arm-repair-estimates'); ?></label></th>
                 <td>
                   <input type="hidden" name="customer_id" id="arm-customer-id" value="<?php echo (int)$estimate->customer_id; ?>">
-                  <input type="text" id="arm-customer-search" class="regular-text" placeholder="<?php esc_attr_e('Search email, phone or name…','arm-repair-estimates'); ?>">
+                  <input type="text" id="arm-customer-search" class="regular-text" placeholder="<?php esc_attr_e('Search email, phone or nameÂ…','arm-repair-estimates'); ?>">
                   <button type="button" class="button" id="arm-customer-search-btn"><?php _e('Search','arm-repair-estimates'); ?></button>
                   <div id="arm-customer-results" class="description" style="margin-top:6px;"></div>
                   <p class="description"><?php _e('Pick an existing customer or leave blank to create a new one using the fields below.','arm-repair-estimates'); ?></p>
@@ -390,7 +400,7 @@ class Controller {
           $('#arm-customer-search-btn').on('click', function(){
             var q = $('#arm-customer-search').val();
             if (!q) return;
-            $('#arm-customer-results').text('<?php echo esc_js(__('Searching…','arm-repair-estimates')); ?>');
+            $('#arm-customer-results').text('<?php echo esc_js(__('SearchingÂ…','arm-repair-estimates')); ?>');
             $.post(ajaxurl, { action:'arm_re_search_customers', _ajax_nonce:'<?php echo wp_create_nonce('arm_re_est_admin'); ?>', q:q }, function(res){
               var $out = $('#arm-customer-results').empty();
               if (!res || !res.success || !res.data || !res.data.length) {
@@ -398,7 +408,7 @@ class Controller {
                 return;
               }
               res.data.forEach(function(r){
-                var $a = $('<a href="#" class="button" style="margin:0 6px 6px 0;"></a>').text('#'+r.id+' '+r.name+' — '+r.email);
+                var $a = $('<a href="#" class="button" style="margin:0 6px 6px 0;"></a>').text('#'+r.id+' '+r.name+' Â— '+r.email);
                 $a.on('click', function(e){ e.preventDefault();
                   $('#arm-customer-id').val(r.id);
                   // Fill fields

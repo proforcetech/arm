@@ -3,22 +3,25 @@ namespace ARM\Admin;
 
 class Dashboard {
     public static function boot() {
-        add_submenu_page(
-            'arm-repair-estimates',
-            __('Dashboard','arm-repair-estimates'),
-            __('Dashboard','arm-repair-estimates'),
-            'manage_options',
-            'arm-dashboard',
-            [__CLASS__,'render_dashboard']
-        );
-add_action('admin_enqueue_scripts', [__CLASS__, 'assets']);
-
+        add_action('admin_enqueue_scripts', [__CLASS__, 'assets']);
     }
 
-	public static function assets($hook) {
-	    if (strpos($hook,'arm-dashboard')===false) return;
-	    wp_enqueue_script('chart-js','https://cdn.jsdelivr.net/npm/chart.js',[],null,true);
-	}
+    public static function menu_page(): array {
+        return [
+            'page_title' => __('Dashboard', 'arm-repair-estimates'),
+            'menu_title' => __('Dashboard', 'arm-repair-estimates'),
+            'capability' => 'manage_options',
+            'menu_slug'  => 'arm-dashboard',
+            'callback'   => [__CLASS__, 'render_dashboard'],
+        ];
+    }
+
+    public static function assets($hook) {
+        if (strpos($hook, 'arm-dashboard') === false) {
+            return;
+        }
+        wp_enqueue_script('chart-js', 'https://cdn.jsdelivr.net/npm/chart.js', [], null, true);
+    }
 
 
     public static function render_dashboard() {
