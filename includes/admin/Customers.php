@@ -137,11 +137,23 @@ final class Customers {
                 $addr = trim(($r->address ?? '') . ( ($r->city ?? '') ? ', '.$r->city : '' ) . ( ($r->state ?? '') ? ', '.$r->state : '' ) . ( ($r->zip ?? '') ? ' '.$r->zip : '' ));
                 $edit = \admin_url('admin.php?page=arm-repair-customers&action=edit&id='.(int)$r->id);
                 $del  = \wp_nonce_url(\admin_url('admin-post.php?action=arm_re_customer_delete&id='.(int)$r->id), 'arm_re_customer_delete');
+                $impersonated_id = \ARM\Utils\Impersonation::get_impersonated_customer_id();
+                $impersonate_url = \wp_nonce_url(
+                    \admin_url('admin-post.php?action=arm_re_customer_impersonate_start&customer_id='.(int)$r->id),
+                    'arm_re_customer_impersonate_start_' . (int) $r->id
+                );
+                $stop_url = \ARM\Utils\Impersonation::stop_url();
                 echo '<tr>';
-                echo '<td>'.esc_html($name ?: '—').'</td>';
-                echo '<td>'.esc_html($r->email ?: '—').'</td>';
-                echo '<td>'.esc_html($r->phone ?: '—').'</td>';
-                echo '<td>'.esc_html($addr ?: '—').'</td>';
+                   . '<a href="'.esc_url($del).'" onclick="return confirm(\''.esc_js(__('Delete this customer?', 'arm-repair-estimates')).'\');">'.esc_html__('Delete', 'arm-repair-estimates').'</a>';
+                if ($impersonated_id === (int) $r->id) {
+                    echo ' | <a href="'.esc_url($stop_url).'" class="arm-impersonate-stop">'.esc_html__('Stop Impersonating', 'arm-repair-estimates').'</a>';
+                } else {
+                    echo ' | <a href="'.esc_url($impersonate_url).'" class="arm-impersonate-start">'.esc_html__('Impersonate', 'arm-repair-estimates').'</a>';
+                }
+                echo '</td>';
+                echo '<td>'.esc_html($r->email ?: 'â€”').'</td>';
+                echo '<td>'.esc_html($r->phone ?: 'â€”').'</td>';
+                echo '<td>'.esc_html($addr ?: 'â€”').'</td>';
                 echo '<td>'.esc_html($r->created_at ?: '').'</td>';
                 echo '<td><a href="'.esc_url($edit).'">'.esc_html__('Edit', 'arm-repair-estimates').'</a> | '
                    . '<a href="'.esc_url($del).'" onclick="return confirm(\''.esc_js(__('Delete this customer?', 'arm-repair-estimates')).'\');">'.esc_html__('Delete', 'arm-repair-estimates').'</a></td>';
@@ -421,6 +433,37 @@ final class Customers {
         exit;
     }
 
+    public static function handle_impersonate_start(): void {
+        if (!\current_user_can('manage_options')) \wp_die('Nope');
+        $customer_id = isset($_REQUEST['customer_id']) ? (int) $_REQUEST['customer_id'] : 0;
+        if ($customer_id <= 0) {
+            self::redirect_with_error(__('Invalid customer.', 'arm-repair-estimates'));
+        }
+        \check_admin_referer('arm_re_customer_impersonate_start_' . $customer_id);
+
+        global $wpdb;
+        $tbl = $wpdb->prefix . 'arm_customers';
+        $exists = (int) $wpdb->get_var($wpdb->prepare("SELECT id FROM $tbl WHERE id=%d", $customer_id));
+        if (!$exists) {
+            self::redirect_with_error(__('Customer not found.', 'arm-repair-estimates'));
+        }
+
+        \ARM\Utils\Impersonation::start($customer_id);
+
+        $redirect = \wp_get_referer() ?: \admin_url('admin.php?page=arm-repair-customers');
+        \wp_safe_redirect($redirect);
+        exit;
+    }
+
+    public static function handle_impersonate_stop(): void {
+        if (!\current_user_can('manage_options')) \wp_die('Nope');
+        \check_admin_referer('arm_re_customer_impersonate_stop');
+        \ARM\Utils\Impersonation::stop();
+        $redirect = \wp_get_referer() ?: \admin_url('admin.php?page=arm-repair-customers');
+        \wp_safe_redirect($redirect);
+        exit;
+    }
+
     /** ===== AJAX search for customers (admin use & estimate builder search) ===== */
     public static function ajax_search(): void {
         if (!\current_user_can('manage_options')) \wp_send_json_error();
@@ -442,7 +485,7 @@ final class Customers {
         foreach ($rows as $r) {
             $label = trim("{$r->first_name} {$r->last_name}");
             $label = $label ?: $r->email;
-            if ($r->phone) $label .= " — {$r->phone}";
+            if ($r->phone) $label .= " â€” {$r->phone}";
             $out[] = [
                 'id'    => (int)$r->id,
                 'label' => $label,
