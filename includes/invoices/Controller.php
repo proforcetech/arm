@@ -219,9 +219,9 @@ class Controller {
             <tbody>
               <?php if ($rows): foreach ($rows as $r):
                 $view = add_query_arg(['arm_invoice' => $r->token], home_url('/'));
-				$short_url = \ARM\Links\Shortlinks::get_or_create_for_invoice((int)$r->id, (string)$r->token);
-              ?>
-              <tr>
+                $short_url = \ARM\Links\Shortlinks::get_or_create_for_invoice((int)$r->id, (string)$r->token);
+            ?>
+            <tr>
                 <td><?php echo esc_html($r->invoice_no); ?></td>
                 <td><?php echo esc_html($r->customer); ?></td>
                 <td><?php echo esc_html($r->email); ?></td>
@@ -230,9 +230,15 @@ class Controller {
                 <td><?php echo esc_html($r->created_at); ?></td>
                 <td>
                   <a href="<?php echo esc_url($view); ?>" target="_blank"><?php _e('View','arm-repair-estimates'); ?></a>
+                  <?php if ($short_url): ?> | <a href="<?php echo esc_url($short_url); ?>" target="_blank"><?php _e('Short Link','arm-repair-estimates'); ?></a><?php endif; ?>
+                  <br>
+                  <button type="button" class="button button-small arm-copy-pay-link" data-pay-link="<?php echo esc_url($short_url ?: $view); ?>"><?php _e('Copy Pay Link','arm-repair-estimates'); ?></button>
+                  <?php if (\ARM\Integrations\Payments_Stripe::is_configured()): ?>
+                    <button type="button" class="button button-small arm-invoice-pay-now" data-invoice-id="<?php echo (int)$r->id; ?>"><?php _e('Collect via Stripe','arm-repair-estimates'); ?></button>
+                  <?php endif; ?>
                 </td>
-              </tr>
-              <?php endforeach; else: ?>
+            </tr>
+            <?php endforeach; else: ?>
               <tr><td colspan="7"><?php _e('No invoices yet.','arm-repair-estimates'); ?></td></tr>
               <?php endif; ?>
             </tbody>

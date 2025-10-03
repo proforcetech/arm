@@ -5,6 +5,9 @@
 
   const $doc = $(document);
   const taxApply = ARM_RE_EST.taxApply || 'parts_labor';
+  const rest = ARM_RE_EST.rest || {};
+  const integrations = ARM_RE_EST.integrations || {};
+  const partstechCfg = ARM_RE_EST.partstech || {};
 
   function parseNum(v) {
     const n = parseFloat(v);
@@ -188,5 +191,154 @@
 
   // Kick off an initial calc after load
   $(recalc);
+
+  /** ------------------------------
+   * Invoice admin helpers
+   * ------------------------------ */
+  $doc.on('click', '.arm-copy-pay-link', function (e) {
+    e.preventDefault();
+    const link = $(this).data('pay-link');
+    if (!link) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(link).then(function () {
+        window.alert(ARM_RE_EST.i18n ? ARM_RE_EST.i18n.copied : 'Copied');
+      }).catch(function () {
+        window.alert(ARM_RE_EST.i18n ? ARM_RE_EST.i18n.copyFailed : 'Copy failed');
+      });
+    } else {
+      const $tmp = $('<input type="text" style="position:absolute;left:-9999px;">').val(link).appendTo('body');
+      $tmp[0].select();
+      try { document.execCommand('copy'); window.alert(ARM_RE_EST.i18n ? ARM_RE_EST.i18n.copied : 'Copied'); }
+      catch (err) { window.alert(ARM_RE_EST.i18n ? ARM_RE_EST.i18n.copyFailed : 'Copy failed'); }
+      $tmp.remove();
+    }
+  });
+
+  $doc.on('click', '.arm-invoice-pay-now', function (e) {
+    e.preventDefault();
+    if (!integrations.stripe || !rest.stripeCheckout) return;
+    const invoiceId = $(this).data('invoice-id');
+    if (!invoiceId) return;
+    const btn = $(this);
+    const originalText = btn.text();
+    btn.prop('disabled', true).text(ARM_RE_EST.i18n ? ARM_RE_EST.i18n.startingPay : 'Starting…');
+    fetch(rest.stripeCheckout, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ invoice_id: invoiceId })
+    }).then(r => r.json()).then(function (data) {
+      btn.prop('disabled', false).text(originalText);
+      if (data && data.url) {
+        window.open(data.url, '_blank');
+      } else {
+        window.alert(data && data.error ? data.error : 'Unable to start checkout.');
+      }
+    }).catch(function (err) {
+      console.error(err);
+      btn.prop('disabled', false).text(originalText);
+      window.alert('Request failed.');
+    });
+  });
+
+  /** ------------------------------
+   * PartsTech helpers inside builder
+   * ------------------------------ */
+  if (integrations.partstech) {
+    const vinInput = $('#arm-partstech-vin');
+    const vinButton = $('#arm-partstech-vin-btn');
+    const vinOutput = $('#arm-partstech-vin-result');
+    const searchInput = $('#arm-partstech-search');
+    const searchButton = $('#arm-partstech-search-btn');
+    const searchResults = $('#arm-partstech-results');
+
+    vinButton.on('click', function () {
+      const vin = (vinInput.val() || '').trim();
+      if (vin.length < 5) {
+        window.alert(ARM_RE_EST.i18n ? ARM_RE_EST.i18n.vinPlaceholder : 'Enter VIN');
+        return;
+      }
+      vinButton.prop('disabled', true);
+      vinOutput.text('…');
+      $.post(partstechCfg.vin, {
+        _ajax_nonce: ARM_RE_EST.nonce,
+        vin: vin
+      }).done(function (resp) {
+        vinButton.prop('disabled', false);
+        if (!resp || !resp.success || !resp.data) {
+          vinOutput.text(ARM_RE_EST.i18n ? ARM_RE_EST.i18n.vinError : 'VIN lookup failed');
+          return;
+        }
+        const data = resp.data;
+        vinOutput.text(data.label || '');
+        if (data.vehicle) {
+          $('#arm-vehicle-year').val(data.vehicle.year || '');
+          $('#arm-vehicle-make').val(data.vehicle.make || '');
+          $('#arm-vehicle-model').val(data.vehicle.model || '');
+          $('#arm-vehicle-engine').val(data.vehicle.engine || '');
+        }
+      }).fail(function () {
+        vinButton.prop('disabled', false);
+        vinOutput.text(ARM_RE_EST.i18n ? ARM_RE_EST.i18n.vinError : 'VIN lookup failed');
+      });
+    });
+
+    searchButton.on('click', function () {
+      const term = (searchInput.val() || '').trim();
+      if (!term) return;
+      searchButton.prop('disabled', true);
+      searchResults.empty().text('…');
+      $.post(partstechCfg.search, {
+        _ajax_nonce: ARM_RE_EST.nonce,
+        query: term,
+        vehicle: {
+          year: $('#arm-vehicle-year').val(),
+          make: $('#arm-vehicle-make').val(),
+          model: $('#arm-vehicle-model').val(),
+          engine: $('#arm-vehicle-engine').val()
+        }
+      }).done(function (resp) {
+        searchButton.prop('disabled', false);
+        searchResults.empty();
+        if (!resp || !resp.success || !resp.data || !resp.data.results || !resp.data.results.length) {
+          searchResults.text(ARM_RE_EST.i18n ? ARM_RE_EST.i18n.searchError : 'No results');
+          return;
+        }
+        resp.data.results.forEach(function (item) {
+          const $row = $('<div class="arm-partstech-item" style="border:1px solid #ddd;padding:8px;margin-bottom:6px;">');
+          $row.append('<strong>' + (item.name || '') + '</strong><br>');
+          if (item.brand) {
+            $row.append('<span>' + item.brand + '</span><br>');
+          }
+          if (item.partNumber) {
+            $row.append('<span>' + item.partNumber + '</span><br>');
+          }
+          if (item.price) {
+            $row.append('<span>' + item.priceFormatted + '</span><br>');
+          }
+          const $btn = $('<button type="button" class="button button-small">Add to estimate</button>');
+          $btn.on('click', function () {
+            const $job = $('.arm-job-block').first();
+            if (!$job.length) return;
+            var idx = $job.data('job-index') || 0;
+            var rowCount = $job.find('tbody tr').length;
+            var rowTpl = (ARM_RE_EST.itemRowTemplate || '').replace(/__JOB_INDEX__/g, idx).replace(/__ROW_INDEX__/g, rowCount);
+            if (!rowTpl) return;
+            const $html = $(rowTpl);
+            $html.find('select').val('PART');
+            $html.find('input[name$="[desc]"]').val(item.name || '');
+            if (item.price) {
+              $html.find('input[name$="[price]"]').val(item.price);
+            }
+            $job.find('tbody').append($html);
+            recalc();
+          });
+          searchResults.append($row.append($btn));
+        });
+      }).fail(function () {
+        searchButton.prop('disabled', false);
+        searchResults.text(ARM_RE_EST.i18n ? ARM_RE_EST.i18n.searchError : 'Search failed');
+      });
+    });
+  }
 
 })(jQuery);
