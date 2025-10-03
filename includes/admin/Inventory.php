@@ -341,6 +341,15 @@ final class Inventory
     }
 
     /**
+     * Public wrapper so other modules (dashboards, exports, tests) can reuse the
+     * schema discovery while still funnelling through a single implementation.
+     */
+    public static function schema_columns(string $table): array
+    {
+        return self::schema_map($table);
+    }
+
+    /**
      * Schema map: resolves commonly used columns.
      * Returns keys: id,name,sku,qty,threshold,cost,price,vendor,notes
      */
