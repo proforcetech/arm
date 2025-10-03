@@ -76,7 +76,7 @@ class Settings {
         
         ?>
         <div class="wrap">
-          <h1><?php _e('ARM Repair Estimates � Settings','arm-repair-estimates'); ?></h1>
+          <h1><?php _e('ARM Repair Estimates  Settings','arm-repair-estimates'); ?></h1>
           <form method="post" action="options.php">
             <?php settings_fields('arm_re_settings'); ?>
             <table class="form-table" role="presentation">
@@ -106,9 +106,135 @@ class Settings {
               <tr><th><?php _e('Shop Email','arm-repair-estimates'); ?></th><td><input type="email" name="arm_re_shop_email" value="<?php echo esc_attr(get_option('arm_re_shop_email','')); ?>"></td></tr>
               <tr><th><?php _e('Logo URL','arm-repair-estimates'); ?></th><td><input type="text" class="regular-text" name="arm_re_logo_url" value="<?php echo esc_attr(get_option('arm_re_logo_url','')); ?>"></td></tr>
 
+            </table>
+
+            <h2><?php _e('Payments & Integrations','arm-repair-estimates'); ?></h2>
+            <table class="form-table" role="presentation">
               <tr>
-                <th><?php _e('Sales Tax Applies To','arm-repair-estimates'); ?></th>
+                <th><?php _e('Currency','arm-repair-estimates'); ?></th>
                 <td>
+                  <input type="text" class="small-text" name="arm_re_currency" value="<?php echo esc_attr(get_option('arm_re_currency','usd')); ?>">
+                  <p class="description"><?php _e('Use a 3-letter ISO code (e.g. usd, cad). Stripe and PayPal must use the same currency.', 'arm-repair-estimates'); ?></p>
+                </td>
+              </tr>
+              <tr>
+                <th><?php _e('Stripe Publishable Key','arm-repair-estimates'); ?></th>
+                <td>
+                  <input type="text" class="regular-text" name="arm_re_stripe_pk" value="<?php echo esc_attr(get_option('arm_re_stripe_pk','')); ?>">
+                  <p class="description"><?php printf(__('Create a <a href="%s" target="_blank">Stripe account</a> and copy the Publishable key from Developers → API keys.', 'arm-repair-estimates'), 'https://dashboard.stripe.com/apikeys'); ?></p>
+                </td>
+              </tr>
+              <tr>
+                <th><?php _e('Stripe Secret Key','arm-repair-estimates'); ?></th>
+                <td>
+                  <input type="text" class="regular-text" name="arm_re_stripe_sk" value="<?php echo esc_attr(get_option('arm_re_stripe_sk','')); ?>">
+                  <p class="description"><?php _e('Paste the Secret key that matches the publishable key above. Use a restricted key with permissions for Checkout Sessions and Payment Intents if possible.', 'arm-repair-estimates'); ?></p>
+                </td>
+              </tr>
+              <tr>
+                <th><?php _e('Stripe Webhook Secret','arm-repair-estimates'); ?></th>
+                <td>
+                  <input type="text" class="regular-text" name="arm_re_stripe_whsec" value="<?php echo esc_attr(get_option('arm_re_stripe_whsec','')); ?>">
+                  <p class="description"><?php printf(__('Create a webhook endpoint in Stripe pointing to <code>%s</code> and copy the signing secret here so invoice statuses update automatically.', 'arm-repair-estimates'), esc_html(rest_url('arm/v1/stripe/webhook'))); ?></p>
+                </td>
+              </tr>
+              <tr>
+                <th><?php _e('Payment Success URL','arm-repair-estimates'); ?></th>
+                <td>
+                  <input type="url" class="regular-text" name="arm_re_pay_success" value="<?php echo esc_attr(get_option('arm_re_pay_success', home_url('/'))); ?>">
+                  <p class="description"><?php _e('Customers are redirected here after successful payment. Query parameters <code>paid</code> and <code>inv</code> are added automatically.', 'arm-repair-estimates'); ?></p>
+                </td>
+              </tr>
+              <tr>
+                <th><?php _e('Payment Cancel URL','arm-repair-estimates'); ?></th>
+                <td>
+                  <input type="url" class="regular-text" name="arm_re_pay_cancel" value="<?php echo esc_attr(get_option('arm_re_pay_cancel', home_url('/'))); ?>">
+                </td>
+              </tr>
+
+              <tr>
+                <th><?php _e('PayPal Environment','arm-repair-estimates'); ?></th>
+                <td>
+                  <select name="arm_re_paypal_env">
+                    <?php foreach (['sandbox'=>__('Sandbox','arm-repair-estimates'),'live'=>__('Live','arm-repair-estimates')] as $k=>$label): ?>
+                      <option value="<?php echo esc_attr($k); ?>" <?php selected(get_option('arm_re_paypal_env','sandbox'), $k); ?>><?php echo esc_html($label); ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                  <p class="description"><?php printf(__('Log in to the <a href="%s" target="_blank">PayPal developer dashboard</a> to create REST API credentials. Use Sandbox while testing.', 'arm-repair-estimates'), 'https://developer.paypal.com/dashboard/applications'); ?></p>
+                </td>
+              </tr>
+              <tr>
+                <th><?php _e('PayPal Client ID','arm-repair-estimates'); ?></th>
+                <td><input type="text" class="regular-text" name="arm_re_paypal_client_id" value="<?php echo esc_attr(get_option('arm_re_paypal_client_id','')); ?>"></td>
+              </tr>
+              <tr>
+                <th><?php _e('PayPal Secret','arm-repair-estimates'); ?></th>
+                <td><input type="text" class="regular-text" name="arm_re_paypal_secret" value="<?php echo esc_attr(get_option('arm_re_paypal_secret','')); ?>">
+                  <p class="description"><?php printf(__('Add a webhook in PayPal using <code>%s</code> for the listener URL and paste the Webhook ID below.', 'arm-repair-estimates'), esc_html(rest_url('arm/v1/paypal/webhook'))); ?></p>
+                </td>
+              </tr>
+              <tr>
+                <th><?php _e('PayPal Webhook ID','arm-repair-estimates'); ?></th>
+                <td><input type="text" class="regular-text" name="arm_re_paypal_webhook_id" value="<?php echo esc_attr(get_option('arm_re_paypal_webhook_id','')); ?>"></td>
+              </tr>
+
+              <tr>
+                <th><?php _e('Zoho Data Center','arm-repair-estimates'); ?></th>
+                <td>
+                  <input type="text" class="small-text" name="arm_zoho_dc" value="<?php echo esc_attr(get_option('arm_zoho_dc','com')); ?>">
+                  <p class="description"><?php _e('Examples: com, eu, in, com.au. This determines the Zoho API host.', 'arm-repair-estimates'); ?></p>
+                </td>
+              </tr>
+              <tr>
+                <th><?php _e('Zoho Client ID','arm-repair-estimates'); ?></th>
+                <td><input type="text" class="regular-text" name="arm_zoho_client_id" value="<?php echo esc_attr(get_option('arm_zoho_client_id','')); ?>"></td>
+              </tr>
+              <tr>
+                <th><?php _e('Zoho Client Secret','arm-repair-estimates'); ?></th>
+                <td><input type="text" class="regular-text" name="arm_zoho_client_secret" value="<?php echo esc_attr(get_option('arm_zoho_client_secret','')); ?>"></td>
+              </tr>
+              <tr>
+                <th><?php _e('Zoho Refresh Token','arm-repair-estimates'); ?></th>
+                <td>
+                  <input type="text" class="regular-text" name="arm_zoho_refresh" value="<?php echo esc_attr(get_option('arm_zoho_refresh','')); ?>">
+                  <p class="description"><?php _e('Generate a self-client grant in Zoho CRM, exchange it for a refresh token, and paste it here. The plugin refreshes access tokens automatically.', 'arm-repair-estimates'); ?></p>
+                </td>
+              </tr>
+              <tr>
+                <th><?php _e('Zoho Deals Module','arm-repair-estimates'); ?></th>
+                <td>
+                  <input type="text" class="regular-text" name="arm_zoho_module_deal" value="<?php echo esc_attr(get_option('arm_zoho_module_deal','Deals')); ?>">
+                  <p class="description"><?php _e('Change only if your Zoho CRM uses a renamed Deals module.', 'arm-repair-estimates'); ?></p>
+                </td>
+              </tr>
+
+              <tr>
+                <th><?php _e('PartsTech API Base','arm-repair-estimates'); ?></th>
+                <td>
+                  <input type="url" class="regular-text" name="arm_partstech_base" value="<?php echo esc_attr(get_option('arm_partstech_base','https://api.partstech.com')); ?>">
+                  <p class="description"><?php _e('Leave as default unless PartsTech support directs you to a regional endpoint.', 'arm-repair-estimates'); ?></p>
+                </td>
+              </tr>
+              <tr>
+                <th><?php _e('PartsTech API Key','arm-repair-estimates'); ?></th>
+                <td>
+                  <input type="text" class="regular-text" name="arm_partstech_api_key" value="<?php echo esc_attr(get_option('arm_partstech_api_key','')); ?>">
+                  <p class="description"><?php printf(__('Request API credentials from <a href="%s" target="_blank">PartsTech</a>. The key is required for VIN decoding and catalog search.', 'arm-repair-estimates'), 'https://www.partstech.com/'); ?></p>
+                </td>
+              </tr>
+              <tr>
+                <th><?php _e('Parts Markup Tiers (JSON)','arm-repair-estimates'); ?></th>
+                <td>
+                  <textarea name="arm_re_markup_tiers" rows="5" class="large-text"><?php echo esc_textarea(get_option('arm_re_markup_tiers','[\n  {"min":0,"max":25,"pct":40},\n  {"min":25,"max":100,"pct":35},\n  {"min":100,"max":999999,"pct":30}\n]')); ?></textarea>
+                  <p class="description"><?php _e('Optional tiers that are applied to catalog results when adding parts to an estimate.', 'arm-repair-estimates'); ?></p>
+                </td>
+              </tr>
+            </table>
+
+            <table class="form-table" role="presentation">
+            <tr>
+              <th><?php _e('Sales Tax Applies To','arm-repair-estimates'); ?></th>
+              <td>
                   <?php $tax_apply = get_option('arm_re_tax_apply','parts_labor'); ?>
                   <label style="margin-right:16px;"><input type="radio" name="arm_re_tax_apply" value="parts_labor" <?php checked($tax_apply,'parts_labor'); ?>> <?php _e('Parts & Labor','arm-repair-estimates'); ?></label>
                   <label><input type="radio" name="arm_re_tax_apply" value="parts_only" <?php checked($tax_apply,'parts_only'); ?>> <?php _e('Parts Only','arm-repair-estimates'); ?></label>

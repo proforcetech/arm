@@ -138,10 +138,10 @@ final class Customers {
                 $edit = \admin_url('admin.php?page=arm-repair-customers&action=edit&id='.(int)$r->id);
                 $del  = \wp_nonce_url(\admin_url('admin-post.php?action=arm_re_customer_delete&id='.(int)$r->id), 'arm_re_customer_delete');
                 echo '<tr>';
-                echo '<td>'.esc_html($name ?: '—').'</td>';
-                echo '<td>'.esc_html($r->email ?: '—').'</td>';
-                echo '<td>'.esc_html($r->phone ?: '—').'</td>';
-                echo '<td>'.esc_html($addr ?: '—').'</td>';
+                echo '<td>'.esc_html($name ?: 'Â—').'</td>';
+                echo '<td>'.esc_html($r->email ?: 'Â—').'</td>';
+                echo '<td>'.esc_html($r->phone ?: 'Â—').'</td>';
+                echo '<td>'.esc_html($addr ?: 'Â—').'</td>';
                 echo '<td>'.esc_html($r->created_at ?: '').'</td>';
                 echo '<td><a href="'.esc_url($edit).'">'.esc_html__('Edit', 'arm-repair-estimates').'</a> | '
                    . '<a href="'.esc_url($del).'" onclick="return confirm(\''.esc_js(__('Delete this customer?', 'arm-repair-estimates')).'\');">'.esc_html__('Delete', 'arm-repair-estimates').'</a></td>';
@@ -274,6 +274,8 @@ final class Customers {
             }
         }
 
+        \do_action('arm_re_customer_saved', $id, $data, 'admin_form');
+
         \wp_redirect(\admin_url('admin.php?page=arm-repair-customers&action=edit&id='.$id.'&updated=1'));
         exit;
     }
@@ -353,6 +355,7 @@ final class Customers {
                     if (!empty($update)) {
                         $update['updated_at'] = \current_time('mysql');
                         $wpdb->update($tbl, $update, ['id' => (int)$existing['id']]);
+                        \do_action('arm_re_customer_saved', (int)$existing['id'], array_merge($existing, $update), 'import_csv');
                         $updated++;
                     }
                 }
@@ -360,6 +363,7 @@ final class Customers {
                 $rec['created_at'] = \current_time('mysql');
                 $rec['updated_at'] = \current_time('mysql');
                 $wpdb->insert($tbl, $rec);
+                \do_action('arm_re_customer_saved', (int)$wpdb->insert_id, $rec, 'import_csv');
                 $inserted++;
             }
         }
@@ -408,9 +412,11 @@ final class Customers {
 
             if ($exists_id) {
                 $wpdb->update($tbl, $rec, ['id' => $exists_id]);
+                \do_action('arm_re_customer_saved', $exists_id, $rec, 'import_crm');
             } else {
                 $rec['created_at'] = \current_time('mysql');
                 $wpdb->insert($tbl, $rec);
+                \do_action('arm_re_customer_saved', (int) $wpdb->insert_id, $rec, 'import_crm');
             }
             $count++;
         }
@@ -442,7 +448,7 @@ final class Customers {
         foreach ($rows as $r) {
             $label = trim("{$r->first_name} {$r->last_name}");
             $label = $label ?: $r->email;
-            if ($r->phone) $label .= " — {$r->phone}";
+            if ($r->phone) $label .= " Â— {$r->phone}";
             $out[] = [
                 'id'    => (int)$r->id,
                 'label' => $label,

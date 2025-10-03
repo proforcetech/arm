@@ -286,7 +286,45 @@ class Controller {
                 <th><label><?php _e('Customer','arm-repair-estimates'); ?></label></th>
                 <td>
                   <input type="hidden" name="customer_id" id="arm-customer-id" value="<?php echo (int)$estimate->customer_id; ?>">
-                  <input type="text" id="arm-customer-search" class="regular-text" placeholder="<?php esc_attr_e('Search email, phone or name…','arm-repair-estimates'); ?>">
+                  <input type="text" id="arm-customer-search" class="regular-text" placeholder="<?php esc_attr_e('Search email, phone or nameÂ…','arm-repair-estimates'); ?>">
+            <h2><?php _e('Vehicle & VIN','arm-repair-estimates'); ?></h2>
+            <table class="form-table" role="presentation">
+              <tr>
+                <th><?php _e('Vehicle Details','arm-repair-estimates'); ?></th>
+                <td>
+                  <label><?php _e('Year','arm-repair-estimates'); ?> <input type="text" id="arm-vehicle-year" name="vehicle_year" class="small-text"></label>
+                  <label style="margin-left:10px;"><?php _e('Make','arm-repair-estimates'); ?> <input type="text" id="arm-vehicle-make" name="vehicle_make" class="regular-text" style="width:120px;"></label>
+                  <label style="margin-left:10px;"><?php _e('Model','arm-repair-estimates'); ?> <input type="text" id="arm-vehicle-model" name="vehicle_model" class="regular-text" style="width:140px;"></label>
+                  <label style="margin-left:10px;"><?php _e('Engine','arm-repair-estimates'); ?> <input type="text" id="arm-vehicle-engine" name="vehicle_engine" class="regular-text" style="width:140px;"></label>
+                </td>
+              </tr>
+              <tr>
+                <th><?php _e('VIN Lookup','arm-repair-estimates'); ?></th>
+                <td>
+                  <input type="text" id="arm-partstech-vin" class="regular-text" maxlength="17" placeholder="<?php esc_attr_e('VIN (17 characters)','arm-repair-estimates'); ?>">
+                  <button type="button" class="button" id="arm-partstech-vin-btn"><?php _e('Decode VIN','arm-repair-estimates'); ?></button>
+                  <span id="arm-partstech-vin-result" class="description" style="margin-left:10px;"></span>
+                </td>
+              </tr>
+            </table>
+
+            <?php if (\ARM\Integrations\PartsTech::is_configured()): ?>
+            <div id="arm-partstech-panel" style="border:1px solid #e5e5e5;padding:15px;border-radius:6px;margin-bottom:20px;">
+              <h3><?php _e('PartsTech Catalog','arm-repair-estimates'); ?></h3>
+              <p class="description"><?php _e('Look up parts using VIN or keyword search. Results can be added directly to the first job in your estimate.', 'arm-repair-estimates'); ?></p>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <input type="text" id="arm-partstech-search" class="regular-text" style="width:240px;" placeholder="<?php esc_attr_e('Search parts by keyword or part number','arm-repair-estimates'); ?>">
+                <button type="button" class="button" id="arm-partstech-search-btn"><?php _e('Search Catalog','arm-repair-estimates'); ?></button>
+              </div>
+              <div id="arm-partstech-results" style="margin-top:12px;"></div>
+            </div>
+            <?php else: ?>
+            <div class="notice notice-warning" style="padding:12px;margin:12px 0;">
+              <p><?php _e('PartsTech API credentials are not configured. Add your API key in Settings to enable catalog search.', 'arm-repair-estimates'); ?></p>
+            </div>
+            <?php endif; ?>
+
+','arm-repair-estimates'); ?>">
                   <button type="button" class="button" id="arm-customer-search-btn"><?php _e('Search','arm-repair-estimates'); ?></button>
                   <div id="arm-customer-results" class="description" style="margin-top:6px;"></div>
                   <p class="description"><?php _e('Pick an existing customer or leave blank to create a new one using the fields below.','arm-repair-estimates'); ?></p>
@@ -364,8 +402,8 @@ class Controller {
         </div>
 
         <script>
-        (function($){
-          // Add Job
+            $('#arm-customer-results').text('<?php echo esc_js(__('SearchingÂ…','arm-repair-estimates')); ?>');
+                var $a = $('<a href="#" class="button" style="margin:0 6px 6px 0;"></a>').text('#'+r.id+' '+r.name+' Â— '+r.email);
           $('#arm-add-job').on('click', function(){
             var idx = $('.arm-job-block').length;
             var html = <?php echo wp_json_encode(self::job_block_template()); ?>;
@@ -390,7 +428,7 @@ class Controller {
           $('#arm-customer-search-btn').on('click', function(){
             var q = $('#arm-customer-search').val();
             if (!q) return;
-            $('#arm-customer-results').text('<?php echo esc_js(__('Searching…','arm-repair-estimates')); ?>');
+            $('#arm-customer-results').text('<?php echo esc_js(__('SearchingÂ…','arm-repair-estimates')); ?>');
             $.post(ajaxurl, { action:'arm_re_search_customers', _ajax_nonce:'<?php echo wp_create_nonce('arm_re_est_admin'); ?>', q:q }, function(res){
               var $out = $('#arm-customer-results').empty();
               if (!res || !res.success || !res.data || !res.data.length) {
@@ -398,7 +436,7 @@ class Controller {
                 return;
               }
               res.data.forEach(function(r){
-                var $a = $('<a href="#" class="button" style="margin:0 6px 6px 0;"></a>').text('#'+r.id+' '+r.name+' — '+r.email);
+                var $a = $('<a href="#" class="button" style="margin:0 6px 6px 0;"></a>').text('#'+r.id+' '+r.name+' Â— '+r.email);
                 $a.on('click', function(e){ e.preventDefault();
                   $('#arm-customer-id').val(r.id);
                   // Fill fields
