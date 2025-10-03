@@ -22,6 +22,15 @@ class PublicView {
         echo '<div class="arm-invoice-view">';
         echo '<h1>'.esc_html(sprintf(__('Invoice %s','arm-repair-estimates'), $inv->invoice_no)).'</h1>';
         echo '<p><strong>'.esc_html($cust->first_name.' '.$cust->last_name).'</strong> &lt;'.esc_html($cust->email).'&gt;</p>';
+        $has_vehicle = ($inv->vin !== null && $inv->vin !== '') || ($inv->license_plate !== null && $inv->license_plate !== '') || ($inv->current_mileage !== null && $inv->current_mileage !== '') || ($inv->last_service_mileage !== null && $inv->last_service_mileage !== '');
+        if ($has_vehicle) {
+            echo '<p><strong>'.esc_html__('Vehicle Details','arm-repair-estimates').'</strong><br>';
+            if ($inv->vin !== null && $inv->vin !== '') echo esc_html__('VIN:','arm-repair-estimates').' '.esc_html($inv->vin).'<br>';
+            if ($inv->license_plate !== null && $inv->license_plate !== '') echo esc_html__('Plate:','arm-repair-estimates').' '.esc_html($inv->license_plate).'<br>';
+            if ($inv->current_mileage !== null && $inv->current_mileage !== '') echo esc_html__('Current Mileage:','arm-repair-estimates').' '.esc_html(number_format_i18n((float)$inv->current_mileage)).'<br>';
+            if ($inv->last_service_mileage !== null && $inv->last_service_mileage !== '') echo esc_html__('Last Service Mileage:','arm-repair-estimates').' '.esc_html(number_format_i18n((float)$inv->last_service_mileage)).'<br>';
+            echo '</p>';
+        }
         echo '<table class="widefat"><thead><tr><th>'.__('Type').'</th><th>'.__('Description').'</th><th>'.__('Qty').'</th><th>'.__('Unit').'</th><th>'.__('Total').'</th></tr></thead><tbody>';
         foreach ($items as $it) {
             echo '<tr><td>'.esc_html($it->item_type).'</td><td>'.esc_html($it->description).'</td><td>'.esc_html($it->qty).'</td><td>'.esc_html(number_format((float)$it->unit_price,2)).'</td><td>'.esc_html(number_format((float)$it->line_total,2)).'</td></tr>';

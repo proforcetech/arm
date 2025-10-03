@@ -52,6 +52,17 @@ $currency          = strtoupper(get_option('arm_re_currency','usd'));
       <?php if (!empty($cust->city) || !empty($cust->zip)): ?><div><?php echo esc_html(trim("{$cust->city} {$cust->zip}")); ?></div><?php endif; ?>
       <?php if (!empty($cust->phone)): ?><div><?php echo esc_html($cust->phone); ?></div><?php endif; ?>
       <?php if (!empty($cust->email)): ?><div><?php echo esc_html($cust->email); ?></div><?php endif; ?>
+      <?php if (($inv->vin !== null && $inv->vin !== '') || ($inv->license_plate !== null && $inv->license_plate !== '') || ($inv->current_mileage !== null && $inv->current_mileage !== '') || ($inv->last_service_mileage !== null && $inv->last_service_mileage !== '')): ?>
+        <h3 style="margin-top:1.5em;"><?php _e('Vehicle','arm-repair-estimates'); ?></h3>
+        <table style="width:100%;border-collapse:collapse;">
+          <tbody>
+            <?php if ($inv->vin !== null && $inv->vin !== ''): ?><tr><th style="text-align:left;padding:4px 0;width:160px;"><?php _e('VIN','arm-repair-estimates'); ?></th><td><?php echo esc_html($inv->vin); ?></td></tr><?php endif; ?>
+            <?php if ($inv->license_plate !== null && $inv->license_plate !== ''): ?><tr><th style="text-align:left;padding:4px 0;width:160px;"><?php _e('License Plate','arm-repair-estimates'); ?></th><td><?php echo esc_html($inv->license_plate); ?></td></tr><?php endif; ?>
+            <?php if ($inv->current_mileage !== null && $inv->current_mileage !== ''): ?><tr><th style="text-align:left;padding:4px 0;width:160px;"><?php _e('Current Mileage','arm-repair-estimates'); ?></th><td><?php echo esc_html(number_format_i18n((float)$inv->current_mileage)); ?></td></tr><?php endif; ?>
+            <?php if ($inv->last_service_mileage !== null && $inv->last_service_mileage !== ''): ?><tr><th style="text-align:left;padding:4px 0;width:160px;"><?php _e('Last Service Mileage','arm-repair-estimates'); ?></th><td><?php echo esc_html(number_format_i18n((float)$inv->last_service_mileage)); ?></td></tr><?php endif; ?>
+          </tbody>
+        </table>
+      <?php endif; ?>
     </div>
     <div style="text-align:right;display:flex;flex-direction:column;gap:10px;align-items:flex-end;">
       <a class="button" href="<?php echo esc_url($pdf_url); ?>"><?php _e('Download PDF','arm-repair-estimates'); ?></a>
