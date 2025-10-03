@@ -16,7 +16,7 @@ final class Activator {
         // Make sure dbDelta is available.
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
-        // If constants/files aren’t available yet (defensive), define/require them.
+        // If constants/files arent available yet (defensive), define/require them.
         if (!defined('ARM_RE_PATH')) {
             define('ARM_RE_PATH', plugin_dir_path(dirname(__FILE__, 2)));
         }
@@ -24,10 +24,11 @@ final class Activator {
         // Ensure modules are loaded so we can call their installers safely.
         self::require_modules();
 
-        $charset = $wpdb->get_charset_collate();
-        $vehicle_table  = $wpdb->prefix . 'arm_vehicle_data';
-        $service_table  = $wpdb->prefix . 'arm_service_types';
-        $requests_table = $wpdb->prefix . 'arm_estimate_requests';
+        $charset         = $wpdb->get_charset_collate();
+        $vehicle_table   = $wpdb->prefix . 'arm_vehicle_data';
+        $vehicles_table  = $wpdb->prefix . 'arm_vehicles';
+        $service_table   = $wpdb->prefix . 'arm_service_types';
+        $requests_table  = $wpdb->prefix . 'arm_estimate_requests';
 
         dbDelta ("CREATE TABLE {$wpdb->prefix}arm_customers (
           id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -65,6 +66,25 @@ final class Activator {
             KEY eng (engine),
             KEY drv (drive),
             KEY trm (trim)
+        ) $charset;");
+
+        dbDelta("CREATE TABLE $vehicles_table (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            customer_id BIGINT UNSIGNED NOT NULL,
+            user_id BIGINT UNSIGNED NULL,
+            year SMALLINT NULL,
+            make VARCHAR(80) NULL,
+            model VARCHAR(120) NULL,
+            engine VARCHAR(120) NULL,
+            trim VARCHAR(120) NULL,
+            vin VARCHAR(32) NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL,
+            deleted_at DATETIME NULL,
+            PRIMARY KEY  (id),
+            KEY cust (customer_id),
+            KEY user (user_id),
+            KEY yr (year)
         ) $charset;");
 
         dbDelta("CREATE TABLE {$wpdb->prefix}arm_appointments (
@@ -155,14 +175,30 @@ final class Activator {
         if (!get_option('arm_re_mileage_rate_default'))  update_option('arm_re_mileage_rate_default', '0');
 
         // Install submodule tables (idempotent)
-        if (class_exists('\\ARM\\Appointments\\Installer')) \ARM\Appointments\Installer::install_tables();
-        if (class_exists('\\ARM\\Estimates\\Controller')) \ARM\Estimates\Controller::install_tables();
-        if (class_exists('\\ARM\\Audit\\Logger'))     \ARM\Audit\Logger::install_tables();
-        if (class_exists('\\ARM\\PDF\\Controller'))       \ARM\PDF\Controller::install_tables();
-        if (class_exists('\\ARM\\Invoices\\Controller'))  \ARM\Invoices\Controller::install_tables();
-        if (class_exists('\\ARM\\Bundles\\Controller'))   \ARM\Bundles\Controller::install_tables();
-        if (class_exists('\\ARM\\Integrations\\Payments_Stripe'))  \ARM\Integrations\Payments_Stripe::install_tables();
-        if (class_exists('\\ARM\\Integrations\\Payments_PayPal'))    \ARM\Integrations\Payments_PayPal::install_tables();
+        if (class_exists('\\ARM\\Appointments\\Installer')) {
+            \ARM\Appointments\Installer::install_tables();
+        }
+        if (class_exists('\\ARM\\Estimates\\Controller')) {
+            \ARM\Estimates\Controller::install_tables();
+        }
+        if (class_exists('\\ARM\\Audit\\Logger')) {
+            \ARM\Audit\Logger::install_tables();
+        }
+        if (class_exists('\\ARM\\PDF\\Controller')) {
+            \ARM\PDF\Controller::install_tables();
+        }
+        if (class_exists('\\ARM\\Invoices\\Controller')) {
+            \ARM\Invoices\Controller::install_tables();
+        }
+        if (class_exists('\\ARM\\Bundles\\Controller')) {
+            \ARM\Bundles\Controller::install_tables();
+        }
+        if (class_exists('\\ARM\\Integrations\\Payments_Stripe')) {
+            \ARM\Integrations\Payments_Stripe::install_tables();
+        }
+        if (class_exists('\\ARM\\Integrations\\Payments_PayPal')) {
+            \ARM\Integrations\Payments_PayPal::install_tables();
+        }
 
     }
 
@@ -184,7 +220,7 @@ final class Activator {
             }
         }
     }
-    
+
     public static function uninstall() {
         // Intentionally left blank to preserve data on uninstall
     }

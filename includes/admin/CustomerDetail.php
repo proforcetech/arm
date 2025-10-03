@@ -33,6 +33,9 @@ class CustomerDetail {
                 'engine'      => sanitize_text_field($_POST['engine']),
                 'trim'        => sanitize_text_field($_POST['trim']),
                 'created_at'  => current_time('mysql'),
+                'updated_at'  => current_time('mysql'),
+                'user_id'     => null,
+                'deleted_at'  => null,
             ];
             $wpdb->insert($tbl_veh, $data);
             echo '<div class="updated"><p>Vehicle added successfully.</p></div>';
@@ -56,6 +59,9 @@ class CustomerDetail {
                         'engine'      => sanitize_text_field($engine),
                         'trim'        => sanitize_text_field($trim),
                         'created_at'  => current_time('mysql'),
+                        'updated_at'  => current_time('mysql'),
+                        'user_id'     => null,
+                        'deleted_at'  => null,
                     ]);
                     $imported++;
                 }
@@ -68,10 +74,10 @@ class CustomerDetail {
 
         // Handle CSV export
         if (!empty($_GET['arm_export_csv']) && check_admin_referer('arm_export_csv_'.$customer_id)) {
-            $vehicles = $wpdb->get_results($wpdb->prepare(
-                "SELECT year, make, model, engine, trim FROM $tbl_veh WHERE customer_id=%d ORDER BY year DESC, make ASC, model ASC",
-                $customer_id
-            ), ARRAY_A);
+        $vehicles = $wpdb->get_results($wpdb->prepare(
+            "SELECT year, make, model, engine, trim FROM $tbl_veh WHERE customer_id=%d AND (deleted_at IS NULL OR deleted_at='0000-00-00 00:00:00') ORDER BY year DESC, make ASC, model ASC",
+            $customer_id
+        ), ARRAY_A);
 
             if ($vehicles) {
                 header('Content-Type: text/csv');
@@ -138,7 +144,7 @@ class CustomerDetail {
 
         // Existing vehicles table
         $vehicles = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM $tbl_veh WHERE customer_id=%d ORDER BY year DESC, make ASC, model ASC",
+            "SELECT * FROM $tbl_veh WHERE customer_id=%d AND (deleted_at IS NULL OR deleted_at='0000-00-00 00:00:00') ORDER BY year DESC, make ASC, model ASC",
             $customer_id
         ));
         if ($vehicles) {

@@ -32,7 +32,7 @@ final class Uninstaller
             $tables = [
                 'arm_estimates','arm_estimate_items','arm_estimate_submissions',
                 'arm_invoices','arm_invoice_items',
-                'arm_vehicle_data','arm_service_types','arm_appointments',
+                'arm_vehicle_data','arm_vehicles','arm_service_types','arm_appointments',
             ];
             foreach ($tables as $t) {
                 $wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}$t");

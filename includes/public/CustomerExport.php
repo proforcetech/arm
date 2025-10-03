@@ -1,6 +1,6 @@
 <?php
 // file: includes/public/CustomerExport.php
-namespace ARM\PublicSite;
+namespace ARM\Public;
 
 if (!defined('ABSPATH')) exit;
 
@@ -18,14 +18,37 @@ final class CustomerExport
 
     public static function export(): void
     {
-        if (!is_user_logged_in()) self::deny();
-        $u = wp_get_current_user();
-        $email = (string) $u->user_email;
-        if ($email === '') self::deny();
+        if (!is_user_logged_in()) {
+            self::deny();
+        }
+
+        $user = wp_get_current_user();
+        $customer = Customer_Dashboard::resolve_customer_for_user($user, false);
 
         global $wpdb;
-        $est = $wpdb->get_results($wpdb->prepare("SELECT id,status,total,created_at FROM {$wpdb->prefix}arm_estimates WHERE email=%s ORDER BY id DESC", $email), ARRAY_A) ?: [];
-        $inv = $wpdb->get_results($wpdb->prepare("SELECT id,status,total,created_at FROM {$wpdb->prefix}arm_invoices WHERE email=%s ORDER BY id DESC", $email), ARRAY_A) ?: [];
+        if ($customer) {
+            $est = $wpdb->get_results($wpdb->prepare(
+                "SELECT id,status,total,created_at FROM {$wpdb->prefix}arm_estimates WHERE customer_id=%d ORDER BY created_at DESC",
+                (int) $customer->id
+            ), ARRAY_A) ?: [];
+            $inv = $wpdb->get_results($wpdb->prepare(
+                "SELECT id,status,total,created_at FROM {$wpdb->prefix}arm_invoices WHERE customer_id=%d ORDER BY created_at DESC",
+                (int) $customer->id
+            ), ARRAY_A) ?: [];
+        } else {
+            $email = sanitize_email($user->user_email);
+            if (!$email) {
+                self::deny();
+            }
+            $est = $wpdb->get_results($wpdb->prepare(
+                "SELECT id,status,total,created_at FROM {$wpdb->prefix}arm_estimates WHERE email=%s ORDER BY created_at DESC",
+                $email
+            ), ARRAY_A) ?: [];
+            $inv = $wpdb->get_results($wpdb->prepare(
+                "SELECT id,status,total,created_at FROM {$wpdb->prefix}arm_invoices WHERE email=%s ORDER BY created_at DESC",
+                $email
+            ), ARRAY_A) ?: [];
+        }
 
         $rows = [['type','id','status','total','created_at']];
         foreach ($est as $r) $rows[] = ['estimate', $r['id'], $r['status'], $r['total'], $r['created_at']];
