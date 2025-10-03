@@ -89,7 +89,21 @@ class CustomerDetail {
         }
 
         echo '<div class="wrap">';
+        $impersonated_id = \ARM\Utils\Impersonation::get_impersonated_customer_id();
+        $impersonate_url = \wp_nonce_url(
+            \admin_url('admin-post.php?action=arm_re_customer_impersonate_start&customer_id='.(int)$customer->id),
+            'arm_re_customer_impersonate_start_' . (int) $customer->id
+        );
+        $stop_url = \ARM\Utils\Impersonation::stop_url();
+
         echo '<h1>' . esc_html($customer->first_name . ' ' . $customer->last_name) . '</h1>';
+        echo '<p>';
+        if ($impersonated_id === (int) $customer->id) {
+            echo '<a href="'.esc_url($stop_url).'" class="button button-secondary">'.esc_html__('Stop Impersonating', 'arm-repair-estimates').'</a>';
+        } else {
+            echo '<a href="'.esc_url($impersonate_url).'" class="button button-primary">'.esc_html__('Impersonate Customer', 'arm-repair-estimates').'</a>';
+        }
+        echo '</p>';
         echo '<p><strong>Email:</strong> ' . esc_html($customer->email) . '<br>';
         echo '<strong>Phone:</strong> ' . esc_html($customer->phone) . '<br>';
         echo '<strong>Address:</strong> ' . esc_html($customer->address . ', ' . $customer->city . ' ' . $customer->zip) . '</p>';

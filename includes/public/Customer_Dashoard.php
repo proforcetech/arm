@@ -1,6 +1,8 @@
 <?php
 namespace ARM\Public;
 
+use ARM\Utils\Impersonation;
+
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 class Customer_Dashboard {
@@ -31,14 +33,43 @@ class Customer_Dashboard {
         }
 
         $user = wp_get_current_user();
-        if (!in_array('arm_customer', (array)$user->roles)) {
-            return '<p>'.__('Access denied.','arm-repair-estimates').'</p>';
+        $impersonated_id = Impersonation::get_impersonated_customer_id();
+        $impersonating   = $impersonated_id > 0;
+        $customer        = null;
+        $customer_id     = 0;
+        $display_name    = $user->display_name ?: $user->user_login;
+
+        if ($impersonating) {
+            $customer = Impersonation::get_customer($impersonated_id);
+            if (!$customer) {
+                return '<p>'.esc_html__('Unable to load impersonated customer.', 'arm-repair-estimates').'</p>';
+            }
+            $customer_id  = (int) $customer->id;
+            $display_name = trim(($customer->first_name ?? '') . ' ' . ($customer->last_name ?? '')) ?: ($customer->email ?? sprintf(__('Customer #%d', 'arm-repair-estimates'), $customer_id));
+        } else {
+            if (!in_array('arm_customer', (array) $user->roles)) {
+                return '<p>'.__('Access denied.','arm-repair-estimates').'</p>';
+            }
+            if (!empty($user->user_email)) {
+                $customer = self::lookup_customer_by_email($user->user_email);
+                if ($customer) {
+                    $customer_id = (int) $customer->id;
+                }
+            }
         }
 
         ob_start();
+        $stop_url = esc_url(Impersonation::stop_url());
         ?>
         <div class="arm-customer-dashboard">
-            <h2><?php echo esc_html__('Welcome, ','arm-repair-estimates').esc_html($user->display_name); ?></h2>
+            <h2><?php echo esc_html__('Welcome, ','arm-repair-estimates').esc_html($display_name); ?></h2>
+            <?php if ($impersonating): ?>
+                <div class="arm-impersonation-toast" style="margin-bottom:20px;padding:12px 16px;background:#f0b849;border-left:4px solid #d26d00;color:#231500;">
+                    <strong><?php esc_html_e('Impersonation mode', 'arm-repair-estimates'); ?></strong> -
+                    <?php echo esc_html(sprintf(__('You are viewing the dashboard as %s.', 'arm-repair-estimates'), $display_name)); ?>
+                    <a href="<?php echo $stop_url; ?>" class="button button-small" style="margin-left:12px;"><?php esc_html_e('Stop impersonating', 'arm-repair-estimates'); ?></a>
+                </div>
+            <?php endif; ?>
 
             <nav class="arm-tabs">
                 <button data-tab="vehicles" class="active"><?php _e('My Vehicles','arm-repair-estimates'); ?></button>
@@ -48,16 +79,16 @@ class Customer_Dashboard {
             </nav>
 
             <section id="tab-vehicles" class="arm-tab active">
-                <?php self::render_vehicles($user->ID); ?>
+                <?php self::render_vehicles($customer_id, $user->ID); ?>
             </section>
             <section id="tab-estimates" class="arm-tab">
-                <?php self::render_estimates($user->ID); ?>
+                <?php self::render_estimates($customer_id, $user->ID); ?>
             </section>
             <section id="tab-invoices" class="arm-tab">
-                <?php self::render_invoices($user->ID); ?>
+                <?php self::render_invoices($customer_id, $user->ID); ?>
             </section>
             <section id="tab-profile" class="arm-tab">
-                <?php self::render_profile($user); ?>
+                <?php self::render_profile($user, $customer, $impersonating); ?>
             </section>
         </div>
         <?php
@@ -65,10 +96,16 @@ class Customer_Dashboard {
     }
 
     /** ===== Vehicles Tab ===== */
-    private static function render_vehicles($user_id) {
+    private static function render_vehicles(int $customer_id, int $user_id) {
         global $wpdb;
         $tbl = $wpdb->prefix.'arm_vehicles';
-        $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $tbl WHERE user_id=%d AND deleted_at IS NULL ORDER BY year DESC, make ASC, model ASC", $user_id));
+        $rows = [];
+        if ($customer_id > 0) {
+            $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $tbl WHERE customer_id=%d AND deleted_at IS NULL ORDER BY year DESC, make ASC, model ASC", $customer_id));
+        }
+        if (!$rows && $user_id > 0) {
+            $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $tbl WHERE user_id=%d AND deleted_at IS NULL ORDER BY year DESC, make ASC, model ASC", $user_id));
+        }
         ?>
         <h3><?php _e('My Vehicles','arm-repair-estimates'); ?></h3>
         <table class="widefat striped">
@@ -107,10 +144,16 @@ class Customer_Dashboard {
     }
 
     /** ===== Estimates Tab ===== */
-    private static function render_estimates($user_id) {
+    private static function render_estimates(int $customer_id, int $user_id) {
         global $wpdb;
         $tbl = $wpdb->prefix.'arm_estimates';
-        $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $tbl WHERE user_id=%d ORDER BY created_at DESC", $user_id));
+        $rows = [];
+        if ($customer_id > 0) {
+            $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $tbl WHERE customer_id=%d ORDER BY created_at DESC", $customer_id));
+        }
+        if (!$rows && $user_id > 0) {
+            $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $tbl WHERE user_id=%d ORDER BY created_at DESC", $user_id));
+        }
         ?>
         <h3><?php _e('My Estimates','arm-repair-estimates'); ?></h3>
         <?php if ($rows): ?>
@@ -129,10 +172,16 @@ class Customer_Dashboard {
     }
 
     /** ===== Invoices Tab ===== */
-    private static function render_invoices($user_id) {
+    private static function render_invoices(int $customer_id, int $user_id) {
         global $wpdb;
         $tbl = $wpdb->prefix.'arm_invoices';
-        $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $tbl WHERE user_id=%d ORDER BY created_at DESC", $user_id));
+        $rows = [];
+        if ($customer_id > 0) {
+            $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $tbl WHERE customer_id=%d ORDER BY created_at DESC", $customer_id));
+        }
+        if (!$rows && $user_id > 0) {
+            $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $tbl WHERE user_id=%d ORDER BY created_at DESC", $user_id));
+        }
         ?>
         <h3><?php _e('My Invoices','arm-repair-estimates'); ?></h3>
         <?php if ($rows): ?>
@@ -151,7 +200,22 @@ class Customer_Dashboard {
     }
 
     /** ===== Profile Tab ===== */
-    private static function render_profile($user) {
+    private static function render_profile($user, ?\stdClass $customer, bool $impersonating) {
+        if ($impersonating) {
+            ?>
+            <h3><?php _e('Customer Profile','arm-repair-estimates'); ?></h3>
+            <?php if ($customer): ?>
+                <p><strong><?php _e('Name','arm-repair-estimates'); ?>:</strong> <?php echo esc_html(trim(($customer->first_name ?? '') . ' ' . ($customer->last_name ?? ''))); ?></p>
+                <p><strong><?php _e('Email','arm-repair-estimates'); ?>:</strong> <?php echo esc_html($customer->email); ?></p>
+                <p><strong><?php _e('Phone','arm-repair-estimates'); ?>:</strong> <?php echo esc_html($customer->phone); ?></p>
+                <p><strong><?php _e('Address','arm-repair-estimates'); ?>:</strong> <?php echo esc_html(trim(($customer->address ?? '') . ' ' . ($customer->city ?? '') . ' ' . ($customer->zip ?? ''))); ?></p>
+            <?php else: ?>
+                <p><?php _e('Customer record not found.', 'arm-repair-estimates'); ?></p>
+            <?php endif; ?>
+            <p class="description"><?php _e('Profile editing is disabled while impersonating a customer.', 'arm-repair-estimates'); ?></p>
+            <?php
+            return;
+        }
         ?>
         <h3><?php _e('My Profile','arm-repair-estimates'); ?></h3>
         <form method="post">
@@ -163,10 +227,19 @@ class Customer_Dashboard {
         <?php
     }
 
+    private static function lookup_customer_by_email(string $email): ?\stdClass {
+        global $wpdb;
+        $tbl = $wpdb->prefix.'arm_customers';
+        return $wpdb->get_row($wpdb->prepare("SELECT * FROM $tbl WHERE email=%s LIMIT 1", $email));
+    }
+
     /** ===== AJAX Vehicle CRUD ===== */
     public static function ajax_vehicle_crud() {
         check_ajax_referer('arm_customer_nonce','nonce');
         if (!is_user_logged_in()) wp_send_json_error(['message'=>'Not logged in']);
+        if (Impersonation::get_impersonated_customer_id() > 0) {
+            wp_send_json_error(['message' => __('Impersonation mode is read-only for vehicles.', 'arm-repair-estimates')]);
+        }
         $user_id = get_current_user_id();
         global $wpdb; $tbl = $wpdb->prefix.'arm_vehicles';
 

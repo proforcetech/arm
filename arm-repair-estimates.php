@@ -28,6 +28,8 @@ add_action('plugins_loaded', function () {
     ARM\Admin\Services::boot();
     ARM\Admin\Vehicles::boot();               // includes CSV import
 
+    ARM\Utils\Impersonation::boot();
+
     ARM\Public\Assets::boot();
     ARM\Public\Shortcode_Form::boot();
     ARM\Public\Ajax_Submit::boot();
