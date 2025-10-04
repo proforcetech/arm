@@ -205,7 +205,7 @@ final class Activator {
     private static function require_modules() {
         // Load only if not already loaded (require_once is idempotent).
         $map = [
-            '\\ARM\\Appointments\\Installer' => 'includes/appointments/installer.php',
+            '\\ARM\\Appointments\\Installer' => 'includes/appointments/Installer.php',
             '\\ARM\\Estimates\\Controller' => 'includes/estimates/Controller.php',
             '\\ARM\\Invoices\\Controller'  => 'includes/invoices/Controller.php',
             '\\ARM\\Bundles\\Controller'   => 'includes/bundles/Controller.php',
