@@ -27,16 +27,22 @@ add_action('plugins_loaded', function () {
     ARM\Admin\Settings::boot();
     ARM\Admin\Services::boot();
     ARM\Admin\Vehicles::boot();               // includes CSV import
+    ARM\Appointments\Admin::boot();
+    ARM\Appointments\Admin_Availability::boot();
 
     ARM\Public\Assets::boot();
     ARM\Public\Shortcode_Form::boot();
     ARM\Public\Ajax_Submit::boot();
     ARM\Public\Customer_Dashboard::boot();
     ARM\Public\CustomerExport::boot();
+    ARM\Appointments\Frontend::boot();
+    ARM\Appointments\Ajax::boot();
 
     ARM\Estimates\Controller::boot();
     ARM\Estimates\PublicView::boot();
     ARM\Estimates\Ajax::boot();
+    ARM\Appointments\Controller::boot();
+    ARM\Appointments\Hooks_Make::boot();
 
     ARM\Invoices\Controller::boot();
     ARM\Invoices\PublicView::boot();
@@ -48,6 +54,7 @@ add_action('plugins_loaded', function () {
     ARM\Integrations\Payments_PayPal::boot();
     ARM\Integrations\PartsTech::boot();
     ARM\Integrations\Zoho::boot();
+    ARM\Integrations\Appointments_Make::boot();
 
     ARM\PDF\Generator::boot();
     ARM\Audit\Logger::boot();
