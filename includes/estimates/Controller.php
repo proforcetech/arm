@@ -511,8 +511,13 @@ class Controller {
         </div>';
     }
 
-    /** Single item row render (existing or blank) */
-    private static function render_item_row($jobIndex, $rowIndex, $it) {
+    /**
+     * Tiny raw template used by inline JS to add rows dynamically.
+     *
+     * Public so other components (e.g. admin assets) can reuse the template
+     * without duplicating markup or violating visibility constraints.
+     */
+    public static function item_row_template() {
         $types = ['LABOR'=>'Labor','PART'=>'Part','FEE'=>'Fee','DISCOUNT'=>'Discount'];
         $type = $it->item_type ?? 'LABOR';
         $desc = $it->description ?? '';
