@@ -178,10 +178,10 @@ class Controller {
                   <a href="<?php echo esc_url($view); ?>" target="_blank"><?php _e('View','arm-repair-estimates'); ?></a> |
                   <a href="<?php echo esc_url($send); ?>"><?php _e('Send Email','arm-repair-estimates'); ?></a> |
                   <a href="<?php echo esc_url($approve); ?>"><?php _e('Mark Approved','arm-repair-estimates'); ?></a> |
-                  <a href="<?php echo esc_url($decline); ?>"><?php _e('Mark Declined','arm-repair-estimates'); ?></a>
+                  <a href="<?php echo esc_url($decline); ?>"><?php _e('Mark Declined','arm-repair-estimates'); ?></a> |
+                  <a href="<?php echo esc_url($short_url); ?>" target="_blank"><?php _e('Short Link','arm-repair-estimates'); ?></a>
                 </td>
               </tr>
-			  <a href="<?php echo esc_url($short_url); ?>" target="_blank">Short</a>
             <?php endforeach; else: ?>
               <tr><td colspan="7"><?php _e('No estimates yet.','arm-repair-estimates'); ?></td></tr>
             <?php endif; ?>
@@ -286,7 +286,15 @@ class Controller {
                 <th><label><?php _e('Customer','arm-repair-estimates'); ?></label></th>
                 <td>
                   <input type="hidden" name="customer_id" id="arm-customer-id" value="<?php echo (int)$estimate->customer_id; ?>">
-                  <input type="text" id="arm-customer-search" class="regular-text" placeholder="<?php esc_attr_e('Search email, phone or name','arm-repair-estimates'); ?>">
+                  <input type="text" id="arm-customer-search" class="regular-text" placeholder="<?php esc_attr_e('Search email, phone or name','arm-repair-estimates'); ?>">
+                  <button type="button" class="button" id="arm-customer-search-btn"><?php _e('Search','arm-repair-estimates'); ?></button>
+                  <div id="arm-customer-results" class="description" style="margin-top:6px;"></div>
+                  <p class="description"><?php _e('Pick an existing customer or leave blank to create a new one using the fields below.','arm-repair-estimates'); ?></p>
+                </td>
+              </tr>
+            </table>
+
+','arm-repair-estimates'); ?>">
             <h2><?php _e('Vehicle & VIN','arm-repair-estimates'); ?></h2>
             <table class="form-table" role="presentation">
               <tr>
@@ -376,22 +384,29 @@ class Controller {
                   <label><?php _e('Miles:','arm-repair-estimates'); ?> <input type="number" step="0.01" name="mileage_miles" id="arm-mileage-miles" value="<?php echo esc_attr($estimate->mileage_miles); ?>" class="small-text"></label>
                   &nbsp;
                   <label><?php _e('Rate/mi:','arm-repair-estimates'); ?> <input type="number" step="0.01" name="mileage_rate" id="arm-mileage-rate" value="<?php echo esc_attr($estimate->mileage_rate); ?>" class="small-text"></label>
-                  &nbsp;
-                  <label><?php _e('Total:','arm-repair-estimates'); ?> <input type="text" readonly id="arm-mileage-total" value="<?php echo esc_attr(number_format((float)$estimate->mileage_total,2)); ?>" class="small-text"></label>
-                </td>
-              </tr>
-              <tr><th><?php _e('Tax Rate (%)'); ?></th><td><input type="number" step="0.01" name="tax_rate" id="arm-tax-rate" value="<?php echo esc_attr($estimate->tax_rate); ?>"></td></tr>
-              <tr><th><?php _e('Subtotal'); ?></th><td><input type="text" readonly id="arm-subtotal" value="<?php echo esc_attr(number_format((float)$estimate->subtotal,2)); ?>"></td></tr>
-              <tr><th><?php _e('Tax'); ?></th><td><input type="text" readonly id="arm-tax" value="<?php echo esc_attr(number_format((float)$estimate->tax_amount,2)); ?>"></td></tr>
-              <tr><th><?php _e('Total'); ?></th><td><input type="text" readonly id="arm-total" value="<?php echo esc_attr(number_format((float)$estimate->total,2)); ?>"></td></tr>
-            </table>
+        (function($){
+          'use strict';
 
-            <h2><?php _e('Notes & Expiration','arm-repair-estimates'); ?></h2>
-            <table class="form-table" role="presentation">
-              <tr><th><?php _e('Expires On','arm-repair-estimates'); ?></th><td><input type="date" name="expires_at" value="<?php echo esc_attr($estimate->expires_at ?? ''); ?>"></td></tr>
-              <tr><th><?php _e('Notes','arm-repair-estimates'); ?></th><td><textarea name="notes" rows="5" class="large-text"><?php echo esc_textarea($estimate->notes ?? ''); ?></textarea></td></tr>
-            </table>
-
+          $(document).on('click', '.arm-add-item', function(){
+          $(document).on('click', '.arm-remove-item', function(){
+            $(this).closest('tr').remove();
+          });
+            $('#arm-customer-results').text('<?php echo esc_js(__('Searching','arm-repair-estimates')); ?>');
+            $.post(ajaxurl, {
+              action: 'arm_re_search_customers',
+              _ajax_nonce: '<?php echo wp_create_nonce('arm_re_est_admin'); ?>',
+              q: q
+            }, function(res){
+                var $a = $('<a href="#" class="button" style="margin:0 6px 6px 0;"></a>').text('#'+r.id+' '+r.name+'  '+r.email);
+                $a.on('click', function(e){
+                  e.preventDefault();
+                  $('#arm-customer-fields [name=c_first_name]').val(r.first_name || '');
+                  $('#arm-customer-fields [name=c_last_name]').val(r.last_name || '');
+                  $('#arm-customer-fields [name=c_email]').val(r.email || '');
+                  $('#arm-customer-fields [name=c_phone]').val(r.phone || '');
+                  $('#arm-customer-fields [name=c_address]').val(r.address || '');
+                  $('#arm-customer-fields [name=c_city]').val(r.city || '');
+                  $('#arm-customer-fields [name=c_zip]').val(r.zip || '');
             <p class="submit">
               <button type="submit" class="button button-primary"><?php _e('Save Estimate','arm-repair-estimates'); ?></button>
               <?php if ($id): ?>
@@ -484,34 +499,56 @@ class Controller {
         echo $html;
     }
 
-    /** HTML template for a job block (placeholders will be replaced) */
-    private static function job_block_template() {
-        return '
-        <div class="arm-job-block" data-job-index="__JOB_INDEX__" style="border:1px solid #ddd; padding:10px; margin-bottom:12px; border-radius:6px;">
-          <div style="display:flex; gap:10px; align-items:center; margin-bottom:8px;">
-            <strong>'.esc_html__('Job','arm-repair-estimates').'</strong>
-            <input type="text" name="jobs[__JOB_INDEX__][title]" value="__JOB_TITLE__" placeholder="'.esc_attr__('Job title (e.g. Front Brake Service)','arm-repair-estimates').'" class="regular-text" style="flex:1;">
-            <label><input type="checkbox" name="jobs[__JOB_INDEX__][is_optional]" value="1" __JOB_OPT_CHECKED__> '.esc_html__('Optional','arm-repair-estimates').'</label>
-          </div>
-          <table class="widefat striped">
-            <thead><tr>
-              <th>'.esc_html__('Type','arm-repair-estimates').'</th>
-              <th>'.esc_html__('Description','arm-repair-estimates').'</th>
-              <th>'.esc_html__('Qty','arm-repair-estimates').'</th>
-              <th>'.esc_html__('Unit Price','arm-repair-estimates').'</th>
-              <th>'.esc_html__('Taxable','arm-repair-estimates').'</th>
-              <th>'.esc_html__('Line Total','arm-repair-estimates').'</th>
-              <th></th>
-            </tr></thead>
-            <tbody>
-              __JOB_ROWS__
-            </tbody>
-            <tfoot><tr><td colspan="7"><button type="button" class="button arm-add-item">'.esc_html__('Add Item','arm-repair-estimates').'</button></td></tr></tfoot>
-          </table>
-        </div>';
-    }
+     * Render a single item row for an existing job/item.
+    private static function render_item_row($job_index, $row_index, $it = null) {
+        $job_index = (int) $job_index;
+        $row_index = (int) $row_index;
+        $it = $it ? (object) $it : (object) [];
 
+        $types = [
+            'LABOR'    => __('Labor', 'arm-repair-estimates'),
+            'PART'     => __('Part', 'arm-repair-estimates'),
+            'FEE'      => __('Fee', 'arm-repair-estimates'),
+            'DISCOUNT' => __('Discount', 'arm-repair-estimates'),
+        ];
+        $type  = $it->item_type ?? 'LABOR';
+        $desc  = $it->description ?? '';
+        $qty   = isset($it->qty) ? (float) $it->qty : 1;
+        $price = isset($it->unit_price) ? (float) $it->unit_price : (float) get_option('arm_re_labor_rate', 125);
+        $tax   = isset($it->taxable) ? (int) $it->taxable : 1;
+        $line  = isset($it->line_total) ? (float) $it->line_total : (($type === 'DISCOUNT' ? -1 : 1) * $qty * $price);
+        ob_start();
+        ?>
+            <td>
+              <select name="jobs[<?php echo esc_attr($job_index); ?>][items][<?php echo esc_attr($row_index); ?>][type]" class="arm-it-type">
+                <?php foreach ($types as $key => $label): ?>
+                  <option value="<?php echo esc_attr($key); ?>" <?php selected($type, $key); ?>><?php echo esc_html($label); ?></option>
+                <?php endforeach; ?>
+              </select>
+            </td>
+            <td><input type="text" name="jobs[<?php echo esc_attr($job_index); ?>][items][<?php echo esc_attr($row_index); ?>][desc]" value="<?php echo esc_attr($desc); ?>" class="widefat"></td>
+            <td><input type="number" step="0.01" name="jobs[<?php echo esc_attr($job_index); ?>][items][<?php echo esc_attr($row_index); ?>][qty]" value="<?php echo esc_attr($qty); ?>" class="small-text arm-it-qty"></td>
+            <td><input type="number" step="0.01" name="jobs[<?php echo esc_attr($job_index); ?>][items][<?php echo esc_attr($row_index); ?>][price]" value="<?php echo esc_attr($price); ?>" class="regular-text arm-it-price"></td>
+            <td><input type="checkbox" name="jobs[<?php echo esc_attr($job_index); ?>][items][<?php echo esc_attr($row_index); ?>][taxable]" value="1" <?php checked($tax, 1); ?> class="arm-it-taxable"></td>
+            <td class="arm-it-total"><?php echo esc_html(number_format((float) $line, 2)); ?></td>
+          </tr>
+        <?php
+        return ob_get_clean();
     /**
+     * Tiny raw template used by inline JS to add rows dynamically.
+     */
+    public static function item_row_template() {
+        $types = [
+            'LABOR'    => __('Labor', 'arm-repair-estimates'),
+            'PART'     => __('Part', 'arm-repair-estimates'),
+            'FEE'      => __('Fee', 'arm-repair-estimates'),
+            'DISCOUNT' => __('Discount', 'arm-repair-estimates'),
+        ];
+
+        foreach ($types as $key => $label) {
+            $opts .= '<option value="'.esc_attr($key).'">'.esc_html($label).'</option>';
+        }
+
      * Tiny raw template used by inline JS to add rows dynamically.
      *
      * Public so other components (e.g. admin assets) can reuse the template
