@@ -293,8 +293,6 @@ class Controller {
                 </td>
               </tr>
             </table>
-
-','arm-repair-estimates'); ?>">
             <h2><?php _e('Vehicle & VIN','arm-repair-estimates'); ?></h2>
             <table class="form-table" role="presentation">
               <tr>
@@ -331,8 +329,6 @@ class Controller {
               <p><?php _e('PartsTech API credentials are not configured. Add your API key in Settings to enable catalog search.', 'arm-repair-estimates'); ?></p>
             </div>
             <?php endif; ?>
-
-','arm-repair-estimates'); ?>">
                   <button type="button" class="button" id="arm-customer-search-btn"><?php _e('Search','arm-repair-estimates'); ?></button>
                   <div id="arm-customer-results" class="description" style="margin-top:6px;"></div>
                   <p class="description"><?php _e('Pick an existing customer or leave blank to create a new one using the fields below.','arm-repair-estimates'); ?></p>
@@ -499,7 +495,7 @@ class Controller {
         echo $html;
     }
 
-     * Render a single item row for an existing job/item.
+     //* Render a single item row for an existing job/item.
     private static function render_item_row($job_index, $row_index, $it = null) {
         $job_index = (int) $job_index;
         $row_index = (int) $row_index;
@@ -534,10 +530,11 @@ class Controller {
           </tr>
         <?php
         return ob_get_clean();
+    }
     /**
      * Tiny raw template used by inline JS to add rows dynamically.
      */
-    public static function item_row_template() {
+/*    public static function item_row_template() {
         $types = [
             'LABOR'    => __('Labor', 'arm-repair-estimates'),
             'PART'     => __('Part', 'arm-repair-estimates'),
@@ -548,8 +545,8 @@ class Controller {
         foreach ($types as $key => $label) {
             $opts .= '<option value="'.esc_attr($key).'">'.esc_html($label).'</option>';
         }
-
-     * Tiny raw template used by inline JS to add rows dynamically.
+*/
+     /* Tiny raw template used by inline JS to add rows dynamically.
      *
      * Public so other components (e.g. admin assets) can reuse the template
      * without duplicating markup or violating visibility constraints.
@@ -581,7 +578,7 @@ class Controller {
     }
 
     /** Tiny raw template used by inline JS to add rows dynamically */
-    private static function item_row_template() {
+/*    private static function item_row_template() {
         $types = ['LABOR'=>'Labor','PART'=>'Part','FEE'=>'Fee','DISCOUNT'=>'Discount'];
         $opts = '';
         foreach ($types as $k=>$v) $opts .= '<option value="'.esc_attr($k).'">'.esc_html($v).'</option>';
@@ -600,7 +597,7 @@ class Controller {
         // Not used; we embed via PHP above to keep translations available
         return '';
     }
-
+    */
     /** ----------------------------------------------------------------
      * Handlers
      * -----------------------------------------------------------------*/
