@@ -47,4 +47,48 @@ final class Installer
             KEY idx_date (date)
         ) $charset;");
     }
+
+    public static function maybe_upgrade_legacy_schema(): void
+    {
+        global $wpdb;
+
+        $table = $wpdb->prefix . 'arm_appointments';
+        $exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table));
+        if (!$exists) {
+            return;
+        }
+
+        $columns = $wpdb->get_results("SHOW COLUMNS FROM $table", ARRAY_A);
+        $column_map = [];
+        foreach ($columns as $column) {
+            $column_map[$column['Field']] = $column;
+        }
+
+        if (isset($column_map['start']) && !isset($column_map['start_datetime'])) {
+            $wpdb->query("ALTER TABLE $table CHANGE COLUMN `start` `start_datetime` DATETIME NOT NULL");
+        }
+
+        if (isset($column_map['end']) && !isset($column_map['end_datetime'])) {
+            $wpdb->query("ALTER TABLE $table CHANGE COLUMN `end` `end_datetime` DATETIME NOT NULL");
+        }
+
+        $indexes     = $wpdb->get_results("SHOW INDEX FROM $table", ARRAY_A);
+        $index_names = [];
+        foreach ($indexes as $index) {
+            $index_names[$index['Key_name']] = true;
+        }
+
+        if (isset($index_names['start'])) {
+            $wpdb->query("ALTER TABLE $table DROP INDEX `start`");
+            unset($index_names['start']);
+        }
+
+        if (!isset($index_names['idx_start']) && isset($column_map['start_datetime'])) {
+            $wpdb->query("ALTER TABLE $table ADD KEY `idx_start` (`start_datetime`)");
+        }
+
+        if (!isset($index_names['idx_status']) && isset($column_map['status'])) {
+            $wpdb->query("ALTER TABLE $table ADD KEY `idx_status` (`status`)");
+        }
+    }
 }

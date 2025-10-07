@@ -87,22 +87,6 @@ final class Activator {
             KEY yr (year)
         ) $charset;");
 
-        dbDelta("CREATE TABLE {$wpdb->prefix}arm_appointments (
-            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            estimate_id BIGINT UNSIGNED NULL,
-            customer_id BIGINT UNSIGNED NULL,
-            start DATETIME NOT NULL,
-            end DATETIME NOT NULL,
-            status VARCHAR(20) NOT NULL DEFAULT 'booked',
-            notes TEXT NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME NULL,
-            PRIMARY KEY (id),
-            KEY est (estimate_id),
-            KEY cust (customer_id),
-            KEY start (start)
-        ) $charset;");
-
         // Service types
         dbDelta("CREATE TABLE $service_table (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -176,6 +160,7 @@ final class Activator {
 
         // Install submodule tables (idempotent)
         if (class_exists('\\ARM\\Appointments\\Installer')) {
+            \ARM\Appointments\Installer::maybe_upgrade_legacy_schema();
             \ARM\Appointments\Installer::install_tables();
         }
         if (class_exists('\\ARM\\Estimates\\Controller')) {
@@ -205,6 +190,33 @@ final class Activator {
             flush_rewrite_rules();
         }
 
+        if (defined('ARM_RE_VERSION')) {
+            update_option('arm_re_version', ARM_RE_VERSION);
+        }
+
+    }
+
+    public static function maybe_upgrade(): void
+    {
+        if (!function_exists('get_option')) {
+            return;
+        }
+
+        $installed_version = get_option('arm_re_version');
+        if ($installed_version && defined('ARM_RE_VERSION') && version_compare($installed_version, ARM_RE_VERSION, '>=')) {
+            return;
+        }
+
+        self::require_modules();
+
+        if (class_exists('\\ARM\\Appointments\\Installer')) {
+            \ARM\Appointments\Installer::maybe_upgrade_legacy_schema();
+            \ARM\Appointments\Installer::install_tables();
+        }
+
+        if (defined('ARM_RE_VERSION')) {
+            update_option('arm_re_version', ARM_RE_VERSION);
+        }
     }
 
     private static function require_modules() {
