@@ -47,6 +47,8 @@ add_action('plugins_loaded', function () {
     ARM\Invoices\Controller::boot();
     ARM\Invoices\PublicView::boot();
 
+    ARM\Links\Shortlinks::boot();
+
     ARM\Bundles\Controller::boot();
     ARM\Bundles\Ajax::boot();
 
