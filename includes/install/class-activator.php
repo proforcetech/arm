@@ -199,6 +199,11 @@ final class Activator {
         if (class_exists('\\ARM\\Integrations\\Payments_PayPal')) {
             \ARM\Integrations\Payments_PayPal::install_tables();
         }
+        if (class_exists('\\ARM\\Links\\Shortlinks')) {
+            \ARM\Links\Shortlinks::install_tables();
+            \ARM\Links\Shortlinks::add_rewrite_rules();
+            flush_rewrite_rules();
+        }
 
     }
 
@@ -213,6 +218,7 @@ final class Activator {
             '\\ARM\\PDF\\Controller'       => 'includes/pdf/Controller.php',
             '\\ARM\\Integrations\\Payments_Stripe'  => 'includes/integrations/Payments_Stripe.php',
             '\\ARM\\Integrations\\Payments_PayPal'    => 'includes/integrations/Payments_PayPal.php',
+            '\\ARM\\Links\\Shortlinks'      => 'includes/links/class-shortlinks.php',
         ];
         foreach ($map as $class => $rel) {
             if (!class_exists($class) && file_exists(ARM_RE_PATH . $rel)) {
