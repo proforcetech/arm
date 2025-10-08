@@ -329,12 +329,6 @@ class Controller {
               <p><?php _e('PartsTech API credentials are not configured. Add your API key in Settings to enable catalog search.', 'arm-repair-estimates'); ?></p>
             </div>
             <?php endif; ?>
-                  <button type="button" class="button" id="arm-customer-search-btn"><?php _e('Search','arm-repair-estimates'); ?></button>
-                  <div id="arm-customer-results" class="description" style="margin-top:6px;"></div>
-                  <p class="description"><?php _e('Pick an existing customer or leave blank to create a new one using the fields below.','arm-repair-estimates'); ?></p>
-                </td>
-              </tr>
-            </table>
 
             <h2><?php _e('Customer Details','arm-repair-estimates'); ?></h2>
             <?php
@@ -380,29 +374,39 @@ class Controller {
                   <label><?php _e('Miles:','arm-repair-estimates'); ?> <input type="number" step="0.01" name="mileage_miles" id="arm-mileage-miles" value="<?php echo esc_attr($estimate->mileage_miles); ?>" class="small-text"></label>
                   &nbsp;
                   <label><?php _e('Rate/mi:','arm-repair-estimates'); ?> <input type="number" step="0.01" name="mileage_rate" id="arm-mileage-rate" value="<?php echo esc_attr($estimate->mileage_rate); ?>" class="small-text"></label>
-        (function($){
-          'use strict';
+                  <p class="description" style="margin-top:6px;">
+                    <?php _e('Calculated mileage total:','arm-repair-estimates'); ?>
+                    <strong>$<span id="arm-mileage-total-display"><?php echo esc_html(number_format((float)$estimate->mileage_total, 2)); ?></span></strong>
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <th><?php _e('Tax Rate','arm-repair-estimates'); ?></th>
+                <td>
+                  <label>
+                    <input type="number" step="0.01" name="tax_rate" id="arm-tax-rate" value="<?php echo esc_attr($estimate->tax_rate); ?>" class="small-text">
+                    %
+                  </label>
+                </td>
+              </tr>
+              <tr>
+                <th><?php _e('Expires','arm-repair-estimates'); ?></th>
+                <td><input type="date" name="expires_at" value="<?php echo esc_attr($estimate->expires_at ? date('Y-m-d', strtotime($estimate->expires_at)) : ''); ?>"></td>
+              </tr>
+              <tr>
+                <th><?php _e('Notes','arm-repair-estimates'); ?></th>
+                <td><textarea name="notes" rows="5" class="large-text"><?php echo esc_textarea($estimate->notes); ?></textarea></td>
+              </tr>
+              <tr>
+                <th><?php _e('Totals','arm-repair-estimates'); ?></th>
+                <td>
+                  <p><?php _e('Subtotal','arm-repair-estimates'); ?>: $<span id="arm-subtotal-display"><?php echo esc_html(number_format((float)$estimate->subtotal, 2)); ?></span></p>
+                  <p><?php _e('Tax','arm-repair-estimates'); ?>: $<span id="arm-tax-display"><?php echo esc_html(number_format((float)$estimate->tax_amount, 2)); ?></span></p>
+                  <p><strong><?php _e('Total','arm-repair-estimates'); ?>: $<span id="arm-total-display"><?php echo esc_html(number_format((float)$estimate->total, 2)); ?></span></strong></p>
+                </td>
+              </tr>
+            </table>
 
-          $(document).on('click', '.arm-add-item', function(){
-          $(document).on('click', '.arm-remove-item', function(){
-            $(this).closest('tr').remove();
-          });
-            $('#arm-customer-results').text('<?php echo esc_js(__('Searching','arm-repair-estimates')); ?>');
-            $.post(ajaxurl, {
-              action: 'arm_re_search_customers',
-              _ajax_nonce: '<?php echo wp_create_nonce('arm_re_est_admin'); ?>',
-              q: q
-            }, function(res){
-                var $a = $('<a href="#" class="button" style="margin:0 6px 6px 0;"></a>').text('#'+r.id+' '+r.name+'  '+r.email);
-                $a.on('click', function(e){
-                  e.preventDefault();
-                  $('#arm-customer-fields [name=c_first_name]').val(r.first_name || '');
-                  $('#arm-customer-fields [name=c_last_name]').val(r.last_name || '');
-                  $('#arm-customer-fields [name=c_email]').val(r.email || '');
-                  $('#arm-customer-fields [name=c_phone]').val(r.phone || '');
-                  $('#arm-customer-fields [name=c_address]').val(r.address || '');
-                  $('#arm-customer-fields [name=c_city]').val(r.city || '');
-                  $('#arm-customer-fields [name=c_zip]').val(r.zip || '');
             <p class="submit">
               <button type="submit" class="button button-primary"><?php _e('Save Estimate','arm-repair-estimates'); ?></button>
               <?php if ($id): ?>
@@ -413,33 +417,202 @@ class Controller {
         </div>
 
         <script>
-            $('#arm-customer-results').text('<?php echo esc_js(__('Searching','arm-repair-estimates')); ?>');
-                var $a = $('<a href="#" class="button" style="margin:0 6px 6px 0;"></a>').text('#'+r.id+' '+r.name+'  '+r.email);
-          $('#arm-add-job').on('click', function(){
-            var idx = $('.arm-job-block').length;
-            var html = <?php echo wp_json_encode(self::job_block_template()); ?>;
-            html = html.replace(/__JOB_INDEX__/g, idx);
-            $('#arm-jobs-wrap').append(html);
+        (function($){
+          'use strict';
+
+          var jobTemplate = <?php echo wp_json_encode(self::job_block_template()); ?>;
+          var rowTemplate = <?php echo wp_json_encode(self::item_row_template()); ?>;
+          var customerNonce = '<?php echo wp_create_nonce('arm_re_est_admin'); ?>';
+          var taxApply = '<?php echo esc_js(get_option('arm_re_tax_apply','parts_labor')); ?>';
+
+          function parseNum(value) {
+            var n = parseFloat(value);
+            return isNaN(n) ? 0 : n;
+          }
+
+          function nextJobIndex() {
+            var max = -1;
+            $('.arm-job-block').each(function(){
+              var idx = parseInt($(this).data('job-index'), 10);
+              if (!isNaN(idx) && idx > max) {
+                max = idx;
+              }
+            });
+            return max + 1;
+          }
+
+          function buildJobHtml(index) {
+            var rows = rowTemplate
+              .replace(/__JOB_INDEX__/g, index)
+              .replace(/__ROW_INDEX__/g, 0);
+            return jobTemplate
+              .replace(/__JOB_INDEX__/g, index)
+              .replace(/__JOB_TITLE__/g, '')
+              .replace(/__JOB_OPT_CHECKED__/g, '')
+              .replace('__JOB_ROWS__', rows);
+          }
+
+          function isLineTaxable(type, taxableChecked) {
+            if (!taxableChecked) {
+              return false;
+            }
+            if (taxApply === 'parts_only') {
+              return type === 'PART';
+            }
+            return true;
+          }
+
+          function updateRowTotal($row) {
+            var qty = parseNum($row.find('.arm-it-qty').val());
+            var price = parseNum($row.find('.arm-it-price').val());
+            var type = String($row.find('.arm-it-type').val() || '').toUpperCase();
+            var line = qty * price;
+            if (type === 'DISCOUNT') {
+              line = -line;
+            }
+            $row.find('.arm-it-total').text(line.toFixed(2));
+            return { amount: line, type: type, taxable: $row.find('.arm-it-taxable').is(':checked') };
+          }
+
+          function recalcTotals() {
+            var subtotal = 0;
+            var taxableBase = 0;
+
+            $('.arm-job-block tbody tr').each(function(){
+              var result = updateRowTotal($(this));
+              subtotal += result.amount;
+              if (isLineTaxable(result.type, result.taxable)) {
+                taxableBase += Math.max(0, result.amount);
+              }
+            });
+
+            var callout = parseNum($('#arm-callout-fee').val());
+            var mileageMiles = parseNum($('#arm-mileage-miles').val());
+            var mileageRate = parseNum($('#arm-mileage-rate').val());
+            var mileageTotal = mileageMiles * mileageRate;
+
+            if (callout > 0) {
+              subtotal += callout;
+            }
+            if (mileageTotal > 0) {
+              subtotal += mileageTotal;
+            }
+
+            var taxRate = parseNum($('#arm-tax-rate').val());
+            var taxAmount = +(taxableBase * (taxRate / 100)).toFixed(2);
+            var total = +(subtotal + taxAmount).toFixed(2);
+
+            $('#arm-mileage-total-display').text(mileageTotal.toFixed(2));
+            $('#arm-subtotal-display').text(subtotal.toFixed(2));
+            $('#arm-tax-display').text(taxAmount.toFixed(2));
+            $('#arm-total-display').text(total.toFixed(2));
+          }
+
+            var idx = nextJobIndex();
+            $('#arm-jobs-wrap').append(buildJobHtml(idx));
+            recalcTotals();
+          $(document).on('click', '.arm-add-item', function(){
+            var idx = parseInt($job.data('job-index'), 10);
+            if (isNaN(idx)) {
+              idx = nextJobIndex();
+              $job.attr('data-job-index', idx);
+            }
+            var row = rowTemplate
+              .replace(/__JOB_INDEX__/g, idx)
+              .replace(/__ROW_INDEX__/g, rowCount);
+            recalcTotals();
+          $(document).on('click', '.arm-remove-item', function(){
+            $(this).closest('tr').remove();
+            recalcTotals();
           });
 
-          // Add item within job
-          $(document).on('click','.arm-add-item', function(){
-            var $job = $(this).closest('.arm-job-block');
-            var idx = $job.data('job-index');
-            var rowCount = $job.find('tbody tr').length;
-            var row = <?php echo wp_json_encode(self::item_row_template()); ?>;
-            row = row.replace(/__JOB_INDEX__/g, idx).replace(/__ROW_INDEX__/g, rowCount);
-            $job.find('tbody').append(row);
+          $(document).on('input change', '.arm-it-qty, .arm-it-price, .arm-it-type, .arm-it-taxable', recalcTotals);
+          $('#arm-callout-fee, #arm-mileage-miles, #arm-mileage-rate, #arm-tax-rate').on('input change', recalcTotals);
+
+          $('#arm-customer-search').on('keydown', function(e){
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              $('#arm-customer-search-btn').trigger('click');
+            }
           });
+            var q = $('#arm-customer-search').val().trim();
+            if (!q) {
+              return;
+            }
+            var $out = $('#arm-customer-results');
+            $out.text('<?php echo esc_js(__('Searching','arm-repair-estimates')); ?>');
+            $.post(ajaxurl, {
+              action: 'arm_re_search_customers',
+              _ajax_nonce: customerNonce,
+              q: q
+            }).done(function(res){
+              $out.empty();
+                var label = '#' + r.id + ' ' + (r.name || '').trim();
+                if (r.email) {
+                  label += ' ' + r.email;
+                }
+                var $a = $('<a href="#" class="button" style="margin:0 6px 6px 0;"></a>').text(label.trim());
+                $a.on('click', function(ev){
+                  ev.preventDefault();
+                  $('#arm-customer-fields [name=c_first_name]').val(r.first_name || '');
+                  $('#arm-customer-fields [name=c_last_name]').val(r.last_name || '');
+                  $('#arm-customer-fields [name=c_email]').val(r.email || '');
+                  $('#arm-customer-fields [name=c_phone]').val(r.phone || '');
+                  $('#arm-customer-fields [name=c_address]').val(r.address || '');
+                  $('#arm-customer-fields [name=c_city]').val(r.city || '');
+                  $('#arm-customer-fields [name=c_zip]').val(r.zip || '');
+                  $out.empty();
+            }).fail(function(){
+              $out.text('<?php echo esc_js(__('Search failed. Please try again.','arm-repair-estimates')); ?>');
+          recalcTotals();
+    /**
+     * Base HTML template for a Job block. Placeholders are replaced at runtime.
+     */
+    private static function job_block_template() {
+        ob_start();
+        ?>
+        <div class="arm-job-block postbox" data-job-index="__JOB_INDEX__">
+          <div class="postbox-header">
+            <h2 class="hndle"><span><?php _e('Job', 'arm-repair-estimates'); ?></span></h2>
+          </div>
+          <div class="inside">
+            <p>
+              <label>
+                <?php _e('Job Title', 'arm-repair-estimates'); ?><br>
+                <input type="text" name="jobs[__JOB_INDEX__][title]" value="__JOB_TITLE__" class="widefat">
+              </label>
+            </p>
+            <p>
+              <label>
+                <input type="checkbox" name="jobs[__JOB_INDEX__][is_optional]" value="1" __JOB_OPT_CHECKED__>
+                <?php _e('Optional job (customer may decline)', 'arm-repair-estimates'); ?>
+              </label>
+            </p>
+            <table class="widefat striped arm-items-table">
+              <thead>
+                <tr>
+                  <th><?php _e('Type', 'arm-repair-estimates'); ?></th>
+                  <th><?php _e('Description', 'arm-repair-estimates'); ?></th>
+                  <th><?php _e('Qty', 'arm-repair-estimates'); ?></th>
+                  <th><?php _e('Unit Price', 'arm-repair-estimates'); ?></th>
+                  <th><?php _e('Taxable', 'arm-repair-estimates'); ?></th>
+                  <th><?php _e('Line Total', 'arm-repair-estimates'); ?></th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                __JOB_ROWS__
+              </tbody>
+            </table>
+            <p>
+              <button type="button" class="button arm-add-item"><?php _e('Add Line Item', 'arm-repair-estimates'); ?></button>
+            </p>
+          </div>
+        </div>
+        <?php
+        return ob_get_clean();
+    }
 
-          // Delete item row
-          $(document).on('click','.arm-remove-item', function(){ $(this).closest('tr').remove(); });
-
-          // Customer search
-          $('#arm-customer-search-btn').on('click', function(){
-            var q = $('#arm-customer-search').val();
-            if (!q) return;
-            $('#arm-customer-results').text('<?php echo esc_js(__('Searching','arm-repair-estimates')); ?>');
             $.post(ajaxurl, { action:'arm_re_search_customers', _ajax_nonce:'<?php echo wp_create_nonce('arm_re_est_admin'); ?>', q:q }, function(res){
               var $out = $('#arm-customer-results').empty();
               if (!res || !res.success || !res.data || !res.data.length) {
