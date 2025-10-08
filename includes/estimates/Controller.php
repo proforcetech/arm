@@ -551,31 +551,22 @@ class Controller {
      * Public so other components (e.g. admin assets) can reuse the template
      * without duplicating markup or violating visibility constraints.
      */
-    public static function item_row_template() {
-        $types = ['LABOR'=>'Labor','PART'=>'Part','FEE'=>'Fee','DISCOUNT'=>'Discount'];
-        $type = $it->item_type ?? 'LABOR';
-        $desc = $it->description ?? '';
-        $qty  = $it->qty ?? 1;
-        $price= $it->unit_price ?? (float) get_option('arm_re_labor_rate', 125);
-        $tax  = isset($it->taxable) ? (int)$it->taxable : 1;
-        $ltot = $it->line_total ?? 0;
-
-        $opts = '';
-        foreach ($types as $k=>$v) {
-            $opts .= '<option value="'.esc_attr($k).'" '.selected($type,$k,false).'>'.esc_html($v).'</option>';
-        }
-
-        return '
-          <tr>
-            <td><select name="jobs['.(int)$jobIndex.'][items]['.(int)$rowIndex.'][type]" class="arm-it-type">'.$opts.'</select></td>
-            <td><input type="text" name="jobs['.(int)$jobIndex.'][items]['.(int)$rowIndex.'][desc]" value="'.esc_attr($desc).'" class="widefat"></td>
-            <td><input type="number" step="0.01" name="jobs['.(int)$jobIndex.'][items]['.(int)$rowIndex.'][qty]" value="'.esc_attr($qty).'" class="small-text arm-it-qty"></td>
-            <td><input type="number" step="0.01" name="jobs['.(int)$jobIndex.'][items]['.(int)$rowIndex.'][price]" value="'.esc_attr($price).'" class="regular-text arm-it-price"></td>
-            <td><input type="checkbox" name="jobs['.(int)$jobIndex.'][items]['.(int)$rowIndex.'][taxable]" value="1" '.checked($tax,1,false).' class="arm-it-taxable"></td>
-            <td class="arm-it-total">'.esc_html(number_format((float)$ltot,2)).'</td>
-            <td><button type="button" class="button arm-remove-item">&times;</button></td>
-          </tr>';
+public static function item_row_template() {
+    $types = ['LABOR'=>'Labor','PART'=>'Part','FEE'=>'Fee','DISCOUNT'=>'Discount'];
+    $opts = '';
+    foreach ($types as $k=>$v) {
+        $opts .= '<option value="'.esc_attr($k).'">'.esc_html($v).'</option>';
     }
+    return '<tr>
+      <td><select name="jobs[__JOB_INDEX__][items][__ROW_INDEX__][type]" class="arm-it-type">'.$opts.'</select></td>
+      <td><input type="text" name="jobs[__JOB_INDEX__][items][__ROW_INDEX__][desc]" class="widefat"></td>
+      <td><input type="number" step="0.01" name="jobs[__JOB_INDEX__][items][__ROW_INDEX__][qty]" value="1" class="small-text arm-it-qty"></td>
+      <td><input type="number" step="0.01" name="jobs[__JOB_INDEX__][items][__ROW_INDEX__][price]" value="0.00" class="regular-text arm-it-price"></td>
+      <td><input type="checkbox" name="jobs[__JOB_INDEX__][items][__ROW_INDEX__][taxable]" value="1" checked class="arm-it-taxable"></td>
+      <td class="arm-it-total">0.00</td>
+      <td><button type="button" class="button arm-remove-item">&times;</button></td>
+    </tr>';
+}
 
     /** Tiny raw template used by inline JS to add rows dynamically */
 /*    private static function item_row_template() {
