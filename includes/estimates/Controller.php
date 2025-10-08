@@ -469,6 +469,54 @@ class Controller {
         <?php
     }
 
+    /**
+     * Base HTML template for a Job block. Placeholders are replaced at runtime.
+     */
+    private static function job_block_template() {
+        ob_start();
+        ?>
+        <div class="arm-job-block postbox" data-job-index="__JOB_INDEX__">
+          <div class="postbox-header">
+            <h2 class="hndle"><span><?php _e('Job', 'arm-repair-estimates'); ?></span></h2>
+          </div>
+          <div class="inside">
+            <p>
+              <label>
+                <?php _e('Job Title', 'arm-repair-estimates'); ?><br>
+                <input type="text" name="jobs[__JOB_INDEX__][title]" value="__JOB_TITLE__" class="widefat">
+              </label>
+            </p>
+            <p>
+              <label>
+                <input type="checkbox" name="jobs[__JOB_INDEX__][is_optional]" value="1" __JOB_OPT_CHECKED__>
+                <?php _e('Optional job (customer may decline)', 'arm-repair-estimates'); ?>
+              </label>
+            </p>
+            <table class="widefat striped arm-items-table">
+              <thead>
+                <tr>
+                  <th><?php _e('Type', 'arm-repair-estimates'); ?></th>
+                  <th><?php _e('Description', 'arm-repair-estimates'); ?></th>
+                  <th><?php _e('Qty', 'arm-repair-estimates'); ?></th>
+                  <th><?php _e('Unit Price', 'arm-repair-estimates'); ?></th>
+                  <th><?php _e('Taxable', 'arm-repair-estimates'); ?></th>
+                  <th><?php _e('Line Total', 'arm-repair-estimates'); ?></th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                __JOB_ROWS__
+              </tbody>
+            </table>
+            <p>
+              <button type="button" class="button arm-add-item"><?php _e('Add Line Item', 'arm-repair-estimates'); ?></button>
+            </p>
+          </div>
+        </div>
+        <?php
+        return ob_get_clean();
+    }
+
     /** Render a Job block with its items (filtered by job_id) */
     private static function render_job_block($job_id, $title, $is_optional, $sort_order, $all_items) {
         $index = max(0, (int)$sort_order); // used as array index for POST
