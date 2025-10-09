@@ -1,5 +1,5 @@
 <?php
-// file: includes/setup/Uninstaller.php
+
 namespace ARM\Setup;
 
 if (!defined('ABSPATH')) exit;
@@ -12,7 +12,7 @@ final class Uninstaller
 {
     public static function uninstall(): void
     {
-        // Options
+        
         $opts = [
             'arm_re_labor_rate','arm_re_tax_rate','arm_re_currency',
             'arm_re_pay_success','arm_re_pay_cancel',
@@ -26,7 +26,7 @@ final class Uninstaller
         ];
         foreach ($opts as $o) delete_option($o);
 
-        // Optional table drop
+        
         if (defined('ARM_RE_DROP_TABLES') && ARM_RE_DROP_TABLES) {
             global $wpdb;
             $tables = [

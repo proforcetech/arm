@@ -12,7 +12,7 @@ class Payments_PayPal {
         add_action('admin_notices', [__CLASS__, 'render_admin_notices']);
     }
 
-    public static function install_tables() { /* no-op */ }
+    public static function install_tables() {  }
 
     public static function is_configured(): bool {
         return PayPalService::is_configured();

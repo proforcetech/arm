@@ -13,15 +13,15 @@ final class Activator {
     public static function activate() {
         global $wpdb;
 
-        // Make sure dbDelta is available.
+        
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
-        // If constants/files arent available yet (defensive), define/require them.
+        
         if (!defined('ARM_RE_PATH')) {
             define('ARM_RE_PATH', plugin_dir_path(dirname(__FILE__, 2)));
         }
 
-        // Ensure modules are loaded so we can call their installers safely.
+        
         self::require_modules();
 
         $charset         = $wpdb->get_charset_collate();
@@ -47,7 +47,7 @@ final class Activator {
         ) $charset;");
 
 
-        // Vehicle dimension table
+        
         dbDelta("CREATE TABLE $vehicle_table (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             year SMALLINT NOT NULL,
@@ -87,7 +87,7 @@ final class Activator {
             KEY yr (year)
         ) $charset;");
 
-        // Service types
+        
         dbDelta("CREATE TABLE $service_table (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             name VARCHAR(128) NOT NULL,
@@ -101,7 +101,7 @@ final class Activator {
             KEY sort (sort_order)
         ) $charset;");
 
-        // Incoming estimate requests
+        
         dbDelta("CREATE TABLE $requests_table (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             vehicle_year SMALLINT NULL,
@@ -134,7 +134,7 @@ final class Activator {
             KEY created_at (created_at)
         ) $charset;");
 
-        // Seed example service types
+        
         $count = (int) $wpdb->get_var("SELECT COUNT(*) FROM $service_table");
         if ($count === 0) {
             $wpdb->insert($service_table, ['name' => 'General Diagnostics', 'is_active' => 1, 'sort_order' => 10]);
@@ -142,7 +142,7 @@ final class Activator {
             $wpdb->insert($service_table, ['name' => 'AC Service',           'is_active' => 1, 'sort_order' => 30]);
         }
 
-        // Defaults (terms, notify, pricing & tax options, call-out/mileage)
+        
         if (!get_option('arm_re_terms_html')) {
             update_option('arm_re_terms_html',
                 '<h3>Terms & Conditions</h3><p><strong>Please read:</strong> Estimates are based on provided information and initial inspection; final pricing may vary after diagnostics.</p>'
@@ -158,7 +158,7 @@ final class Activator {
         if (!get_option('arm_re_callout_default'))       update_option('arm_re_callout_default', '0');
         if (!get_option('arm_re_mileage_rate_default'))  update_option('arm_re_mileage_rate_default', '0');
 
-        // Install submodule tables (idempotent)
+        
         if (class_exists('\\ARM\\Appointments\\Installer')) {
             \ARM\Appointments\Installer::maybe_upgrade_legacy_schema();
             \ARM\Appointments\Installer::install_tables();
@@ -220,7 +220,7 @@ final class Activator {
     }
 
     private static function require_modules() {
-        // Load only if not already loaded (require_once is idempotent).
+        
         $map = [
             '\\ARM\\Appointments\\Installer' => 'includes/appointments/Installer.php',
             '\\ARM\\Estimates\\Controller' => 'includes/estimates/Controller.php',
@@ -240,6 +240,6 @@ final class Activator {
     }
 
     public static function uninstall() {
-        // Intentionally left blank to preserve data on uninstall
+        
     }
 }

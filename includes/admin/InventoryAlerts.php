@@ -1,5 +1,5 @@
 <?php
-// file: includes/admin/InventoryAlerts.php
+
 namespace ARM\Admin;
 
 if (!defined('ABSPATH')) exit;

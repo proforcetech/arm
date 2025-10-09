@@ -1,4 +1,3 @@
-// includes/compat-shim.php
 <?php
 if (class_exists('ARM_RE_Estimates') === false && class_exists('ARM\\Estimates\\Controller')) {
     class_alias('ARM\\Estimates\\Controller', 'ARM_RE_Estimates');

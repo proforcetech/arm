@@ -1,5 +1,5 @@
 <?php
-// file: includes/setup/SchemaFix.php
+
 namespace ARM\Setup;
 
 if (!defined('ABSPATH')) exit;
@@ -9,12 +9,12 @@ class SchemaFix {
         global $wpdb;
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
-        // 1) Never try to re-add PKs via CHANGE COLUMN.
-        //    If you truly need to add a PK, only do it if missing.
+        
+        
         self::ensurePrimaryKey($wpdb->prefix . 'arm_customers', 'id');
         self::ensurePrimaryKey($wpdb->prefix . 'arm_appointments', 'id');
 
-        // 2) Fix the availability column definitions (remove inline comments & trailing commas)
+        
         self::modifyColumn(
             $wpdb->prefix . 'arm_availability',
             'day_of_week',
@@ -26,7 +26,7 @@ class SchemaFix {
             "DATE NULL COMMENT 'for holiday single day'"
         );
 
-        // 3) Add well-named indexes (replaces any “ADD COLUMN INDEX(...)” logic)
+        
         self::addIndex($wpdb->prefix . 'arm_estimates', 'idx_arm_estimates_customer_id', ['customer_id']);
         self::addIndex($wpdb->prefix . 'arm_estimates', 'idx_arm_estimates_request_id', ['request_id']);
 
@@ -59,14 +59,14 @@ class SchemaFix {
             )
         );
         if (!$hasPk) {
-            // Only add a PK if it doesn't exist
+            
             $wpdb->query("ALTER TABLE `$table` ADD PRIMARY KEY (`$column`)");
         }
     }
 
     private static function modifyColumn(string $table, string $column, string $definition): void {
         global $wpdb;
-        // Only attempt if the column exists
+        
         $exists = $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
@@ -84,9 +84,9 @@ class SchemaFix {
 
     private static function addIndex(string $table, string $indexName, array $columns, string $type = 'INDEX'): void {
         global $wpdb;
-        if (empty($columns)) return; // guard against bad callers
+        if (empty($columns)) return; 
 
-        // Check if index already exists
+        
         $exists = $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS
@@ -99,7 +99,7 @@ class SchemaFix {
         );
         if ($exists) return;
 
-        // Build column list with backticks
+        
         $cols = implode('`,`', array_map('sanitize_key', $columns));
         $sql  = "ALTER TABLE `$table` ADD $type `$indexName` (`$cols`)";
         $wpdb->query($sql);

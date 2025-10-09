@@ -9,7 +9,7 @@ class Controller {
      * Boot hooks (submenu, actions, public view)
      * --------------------------------------------------------------*/
     public static function boot() {
-        // Admin UI
+        
         add_action('admin_menu', function () {
             add_submenu_page(
                 'arm-repair-estimates',
@@ -21,10 +21,10 @@ class Controller {
             );
         });
 
-        // Convert from Estimate action
+        
         add_action('admin_post_arm_re_convert_estimate_to_invoice', [__CLASS__, 'convert_from_estimate']);
 
-        // Public viewing via token
+        
         add_filter('query_vars', function ($vars) { $vars[] = 'arm_invoice'; return $vars; });
         add_action('template_redirect', [__CLASS__, 'render_public_if_requested']);
     }
@@ -58,7 +58,7 @@ class Controller {
             PRIMARY KEY(id)
         ) $charset;");
 
-        // Allow the same item types as estimates (plus legacy)
+        
         dbDelta("CREATE TABLE $itT (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             invoice_id BIGINT UNSIGNED NOT NULL,
@@ -102,12 +102,12 @@ class Controller {
         $e = $wpdb->get_row($wpdb->prepare("SELECT * FROM $eT WHERE id=%d", $eid));
         if (!$e) wp_die('Estimate not found');
 
-        // Require APPROVED; relax by removing these two lines if desired
+        
         if ($e->status !== 'APPROVED') {
             wp_die('Estimate must be APPROVED before conversion.');
         }
 
-        // Create invoice shell
+        
         $wpdb->insert($invT, [
             'estimate_id' => $e->id,
             'customer_id' => $e->customer_id,
@@ -123,7 +123,7 @@ class Controller {
         ]);
         $inv_id = (int)$wpdb->insert_id;
 
-        // Copy estimate items
+        
         $items = $wpdb->get_results($wpdb->prepare(
             "SELECT * FROM $eiT WHERE estimate_id=%d ORDER BY sort_order ASC, id ASC", $eid
         ));
@@ -141,8 +141,8 @@ class Controller {
             ]);
         }
 
-        // If estimate had callout/mileage in totals but not as explicit lines, add them as fee items for clarity.
-        // (Estimates module stores these in the estimates table.)
+        
+        
         $addedExtras = 0;
         if (!empty($e->callout_fee) && (float)$e->callout_fee > 0) {
             $wpdb->insert($iiT, [
@@ -177,7 +177,7 @@ class Controller {
             $addedExtras++;
         }
 
-        // Audit log (namespaced audit if available)
+        
         if (class_exists('\\ARM\\Audit\\Logger')) {
             \ARM\Audit\Logger::log('estimate', $eid, 'converted_to_invoice', 'admin', ['invoice_id' => $inv_id, 'extras' => $addedExtras]);
         }
@@ -265,11 +265,11 @@ class Controller {
         $items = $wpdb->get_results($wpdb->prepare("SELECT * FROM $itT WHERE invoice_id=%d ORDER BY sort_order ASC, id ASC", (int)$inv->id));
         $cust  = $wpdb->get_row($wpdb->prepare("SELECT * FROM $cT WHERE id=%d", (int)$inv->customer_id));
 
-        // Reuse your existing template if present
+        
         if (defined('ARM_RE_PATH') && file_exists(ARM_RE_PATH . 'templates/invoice-view.php')) {
             include ARM_RE_PATH . 'templates/invoice-view.php';
         } else {
-            // Minimal fallback
+            
             echo '<div class="arm-invoice">';
             echo '<h2>' . esc_html(sprintf(__('Invoice %s', 'arm-repair-estimates'), $inv->invoice_no)) . '</h2>';
             if ($cust) {

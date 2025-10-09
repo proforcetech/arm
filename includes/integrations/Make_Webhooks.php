@@ -1,5 +1,5 @@
 <?php
-// file: includes/integrations/Make_Webhooks.php
+
 namespace ARM\Integrations;
 
 if (!defined('ABSPATH')) exit;
@@ -17,7 +17,7 @@ final class Make_Webhooks
 
     public static function boot(): void
     {
-        // Optional: wire common hooks here if desired.
+        
     }
 
     /** Fire a webhook to the configured URL. */
@@ -90,7 +90,7 @@ final class Make_Webhooks
     }
 }
 
-// Optional CLI: wp arm:export <customers|invoices|estimates|appointments> [--limit=N] [--offset=N]
+
 if (defined('WP_CLI') && WP_CLI && class_exists('\WP_CLI')) {
     \WP_CLI::add_command('arm:export', function($args, $assoc){
         $type   = $args[0] ?? '';

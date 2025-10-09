@@ -6,13 +6,13 @@ if (!defined('ABSPATH')) exit;
 final class PublicView {
 
     public static function boot(): void {
-        // Make query var available (?arm_estimate=TOKEN)
+        
         add_filter('query_vars', function ($vars) { $vars[] = 'arm_estimate'; return $vars; });
 
-        // Route rendering
+        
         add_action('template_redirect', [__CLASS__, 'maybe_render']);
 
-        // Enqueue assets only on estimate view
+        
         add_action('wp_enqueue_scripts', [__CLASS__, 'maybe_enqueue_assets']);
     }
 
@@ -21,7 +21,7 @@ final class PublicView {
         $token = get_query_var('arm_estimate');
         if (!$token) return;
 
-        // Core styles you already ship
+        
         wp_enqueue_style(
             'arm-re-frontend',
             defined('ARM_RE_URL') ? ARM_RE_URL.'assets/css/arm-frontend.css' : plugins_url('/assets/css/arm-frontend.css', dirname(__FILE__,2)),
@@ -29,7 +29,7 @@ final class PublicView {
             defined('ARM_RE_VERSION') ? ARM_RE_VERSION : '1.0.0'
         );
 
-        // Public estimate JS
+        
         wp_enqueue_script(
             'arm-re-estimate-public',
             defined('ARM_RE_URL') ? ARM_RE_URL.'assets/js/estimate-public.js' : plugins_url('/assets/js/estimate-public.js', dirname(__FILE__,2)),
@@ -66,7 +66,7 @@ final class PublicView {
         $est = $wpdb->get_row($wpdb->prepare("SELECT * FROM $tblE WHERE token=%s", $token));
         if (!$est) { status_header(404); wp_die(__('Estimate not found.', 'arm-repair-estimates')); }
 
-        // Load related records
+        
         $items = $wpdb->get_results($wpdb->prepare(
             "SELECT * FROM $tblI WHERE estimate_id=%d ORDER BY sort_order ASC, id ASC",
             (int)$est->id
@@ -77,7 +77,7 @@ final class PublicView {
         ));
         $terms = wp_kses_post(get_option('arm_re_terms_html', ''));
 
-        // Branding
+        
         $shop = (object)[
             'name'    => get_option('arm_re_shop_name',''),
             'address' => get_option('arm_re_shop_address',''),
@@ -86,14 +86,14 @@ final class PublicView {
             'logo'    => get_option('arm_re_logo_url',''),
         ];
 
-        // Let theme style the page (keeps formatting)
+        
         status_header(200);
         get_header();
 
-        // Make variables available to template
+        
         $ARM_RE_ESTIMATE_CONTEXT = compact('est','items','cust','terms','shop');
 
-        // Load template from plugin
+        
         $tpl = defined('ARM_RE_PATH')
             ? ARM_RE_PATH.'templates/estimate-view.php'
             : dirname(__FILE__,2).'/templates/estimate-view.php';

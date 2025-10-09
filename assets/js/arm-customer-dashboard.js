@@ -1,5 +1,4 @@
 jQuery(document).ready(function ($) {
-    /** ===== Tab Switching ===== */
     $(".arm-tabs button").on("click", function () {
         $(".arm-tabs button").removeClass("active");
         $(this).addClass("active");
@@ -9,13 +8,11 @@ jQuery(document).ready(function ($) {
         $("#tab-" + tab).addClass("active");
     });
 
-    /** ===== Vehicles: Show Add Form ===== */
     $(".arm-add-vehicle").on("click", function () {
         $("#arm-vehicle-form").show().find("form")[0].reset();
         $("#arm-vehicle-form input[name=id]").val("");
     });
 
-    /** ===== Vehicles: Edit ===== */
     $(".arm-edit-vehicle").on("click", function () {
         var row = $(this).closest("tr");
         var id = $(this).data("id");
@@ -25,10 +22,9 @@ jQuery(document).ready(function ($) {
         $("#arm-vehicle-form input[name=year]").val(row.find("td").eq(0).text());
         $("#arm-vehicle-form input[name=make]").val(row.find("td").eq(1).text());
         $("#arm-vehicle-form input[name=model]").val(row.find("td").eq(2).text());
-        // engine/trim not in table -> left blank
+
     });
 
-    /** ===== Vehicles: Delete ===== */
     $(".arm-del-vehicle").on("click", function () {
         if (!confirm("Delete this vehicle?")) return;
         var id = $(this).data("id");
@@ -47,7 +43,6 @@ jQuery(document).ready(function ($) {
         });
     });
 
-    /** ===== Vehicles: Save (Add/Edit) ===== */
     $("#arm-vehicle-form form").on("submit", function (e) {
         e.preventDefault();
 

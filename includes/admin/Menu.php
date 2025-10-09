@@ -78,7 +78,7 @@ class Menu
                 CustomerDetail::render($id);
             }
         );
-        // Invoices, Bundles, Appointments register their own submenu entries in their modules.
+        
     }
 
     public static function render_requests_page(): void

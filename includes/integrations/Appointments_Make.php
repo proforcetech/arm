@@ -1,5 +1,5 @@
 <?php
-// file: includes/integrations/Appointments_Make.php
+
 namespace ARM\Integrations;
 
 if (!defined('ABSPATH')) exit;
@@ -24,7 +24,7 @@ final class Appointments_Make
 
     public static function on_updated(int $appt_id, string $start, string $end): void
     {
-        // Look up estimate_id
+        
         global $wpdb;
         $estimate_id = (int) $wpdb->get_var($wpdb->prepare(
             "SELECT estimate_id FROM {$wpdb->prefix}arm_appointments WHERE id=%d", $appt_id
@@ -43,7 +43,7 @@ final class Appointments_Make
         global $wpdb;
         $pfx = $wpdb->prefix;
 
-        // Join appointment + estimate + customer (fallback to estimate's contact fields)
+        
         $appt = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$pfx}arm_appointments WHERE id=%d", $appt_id));
         $est  = $estimate_id > 0
             ? $wpdb->get_row($wpdb->prepare("SELECT * FROM {$pfx}arm_estimates WHERE id=%d", $estimate_id))
@@ -77,7 +77,7 @@ final class Appointments_Make
             ],
         ];
 
-        // Prefer dedicated Appointment webhook option; fallback to default
+        
         $url = get_option(Make_Webhooks::OPT_CAL_HOOK, '') ?: get_option(Make_Webhooks::OPT_DEFAULT, '');
         Make_Webhooks::send($type, $payload, $url);
     }

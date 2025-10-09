@@ -58,7 +58,7 @@ class Ajax_Submit {
         $ok = $wpdb->insert($tbl, $data);
         if (!$ok) wp_send_json_error(['message'=>'DB error']);
 
-        // Notify admin
+        
         $admin_email = sanitize_email(get_option('arm_re_notify_email', get_option('admin_email')));
         if ($admin_email) {
             $subj = sprintf('[Estimate Request] %s %s', $data['first_name'], $data['last_name']);

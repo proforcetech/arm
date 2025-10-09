@@ -1,5 +1,5 @@
 <?php
-// file: includes/admin/Settings_Integrations.php
+
 namespace ARM\Admin;
 if (!defined('ABSPATH')) exit;
 
@@ -25,7 +25,7 @@ final class Settings_Integrations {
     }
 
     private static function opt_keys(): array {
-        // why: avoid hard failure if ARM\Integrations\Make_Webhooks is absent
+        
         $class = 'ARM\\Integrations\\Make_Webhooks';
         if (class_exists($class)) {
             return [

@@ -95,7 +95,7 @@ class Shortcode_Form {
         return ob_get_clean();
     }
 
-    // Vehicle options chain
+    
     public static function ajax_get_vehicle_options() {
         check_ajax_referer('arm_re_nonce','nonce');
         global $wpdb;

@@ -10,14 +10,14 @@ if (!defined('ABSPATH')) exit;
 class Controller {
 
     /** keep schema extensible (no tables needed today) */
-    public static function install_tables() { /* no-op */ }
+    public static function install_tables() {  }
 
     public static function boot() {
-        // Admin actions to download PDFs
+        
         add_action('admin_post_arm_re_pdf_estimate', [__CLASS__, 'admin_pdf_estimate']);
         add_action('admin_post_arm_re_pdf_invoice',  [__CLASS__, 'admin_pdf_invoice']);
 
-        // Optional public download by token (e.g., ?arm_estimate_pdf=TOKEN)
+        
         add_filter('query_vars', function($vars){
             $vars[] = 'arm_estimate_pdf';
             $vars[] = 'arm_invoice_pdf';
@@ -165,7 +165,7 @@ class Controller {
         <?php echo $header; ?>
         <h2><?php echo esc_html(sprintf(__('Estimate %s','arm-repair-estimates'), $est->estimate_no)); ?></h2>
         <p class="muted"><?php echo esc_html(sprintf(__('Status: %s','arm-repair-estimates'), $est->status)); ?>
-        <?php if(!empty($est->expires_at)) echo ' • ' . esc_html(sprintf(__('Expires: %s','arm-repair-estimates'), $est->expires_at)); ?></p>
+        <?php if(!empty($est->expires_at)) echo ' â€¢ ' . esc_html(sprintf(__('Expires: %s','arm-repair-estimates'), $est->expires_at)); ?></p>
 
         <?php if ($cust): ?>
           <p><strong><?php echo esc_html($cust->first_name.' '.$cust->last_name); ?></strong><br>
@@ -274,7 +274,7 @@ class Controller {
     /** ------------------------- Render engine ----------------------- */
 
     private static function stream_pdf_or_html($html, $filename) {
-        // Try Dompdf
+        
         if (class_exists('\\Dompdf\\Dompdf')) {
             $dompdf = new \Dompdf\Dompdf(['isRemoteEnabled'=>true,'defaultFont'=>'DejaVu Sans']);
             $dompdf->loadHtml($html, 'UTF-8');
@@ -283,14 +283,14 @@ class Controller {
             $dompdf->stream($filename, ['Attachment'=>true]);
             exit;
         }
-        // Try mPDF
+        
         if (class_exists('\\Mpdf\\Mpdf')) {
             $mpdf = new \Mpdf\Mpdf(['mode'=>'utf-8','format'=>'A4']);
             $mpdf->WriteHTML($html);
-            $mpdf->Output($filename, 'D'); // download
+            $mpdf->Output($filename, 'D'); 
             exit;
         }
-        // Try TCPDF
+        
         if (class_exists('\\TCPDF')) {
             $pdf = new \TCPDF();
             $pdf->AddPage();
@@ -299,7 +299,7 @@ class Controller {
             exit;
         }
 
-        // Fallback: printable HTML
+        
         nocache_headers();
         header('Content-Type: text/html; charset=utf-8');
         echo "<div style='padding:12px;background:#fff3cd;border:1px solid #ffeeba;margin:12px 0;font-family:sans-serif;'>".

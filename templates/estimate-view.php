@@ -1,9 +1,8 @@
 <?php
 if (!defined('ABSPATH')) exit;
 /** @var array $ARM_RE_ESTIMATE_CONTEXT */
-extract($ARM_RE_ESTIMATE_CONTEXT); // brings $est,$items,$cust,$terms,$shop into scope
+extract($ARM_RE_ESTIMATE_CONTEXT);
 
-// Human status labels
 $label = [
     'DRAFT'            => __('Draft', 'arm-repair-estimates'),
     'SENT'             => __('Sent', 'arm-repair-estimates'),
@@ -17,7 +16,6 @@ $can_act = in_array($est->status, ['SENT','NEEDS_REAPPROVAL'], true);
 <div class="arm-estimate-wrap arm-container" style="max-width:960px;margin:24px auto;">
   <div class="arm-card" style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:24px;box-shadow:0 1px 2px rgba(0,0,0,0.04)">
 
-    <!-- Header -->
     <div class="arm-flex arm-justify-between arm-items-center" style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;">
       <div class="arm-shop">
         <?php if (!empty($shop->logo)): ?>
@@ -41,7 +39,6 @@ $can_act = in_array($est->status, ['SENT','NEEDS_REAPPROVAL'], true);
       </div>
     </div>
 
-    <!-- Bill To -->
     <div style="display:flex;gap:24px;margin-top:24px;flex-wrap:wrap;">
       <div style="flex:1 1 280px;">
         <h3 style="margin:0 0 8px;"><?php _e('Bill To', 'arm-repair-estimates'); ?></h3>
@@ -60,7 +57,6 @@ $can_act = in_array($est->status, ['SENT','NEEDS_REAPPROVAL'], true);
       </div>
     </div>
 
-    <!-- Items -->
     <div style="margin-top:16px;overflow:auto;">
       <table class="widefat striped" style="width:100%;border-collapse:collapse;">
         <thead>
@@ -102,14 +98,12 @@ $can_act = in_array($est->status, ['SENT','NEEDS_REAPPROVAL'], true);
       </table>
     </div>
 
-    <!-- Notes -->
     <?php if (!empty($est->notes)): ?>
       <div style="margin-top:12px;padding:12px;border-left:3px solid #e5e5e5;background:#fafafa;">
         <?php echo wpautop(wp_kses_post($est->notes)); ?>
       </div>
     <?php endif; ?>
 
-    <!-- Terms -->
     <?php if (!empty($terms)): ?>
       <div style="margin-top:18px;">
         <h3 style="margin:0 0 6px;"><?php _e('Terms & Conditions', 'arm-repair-estimates'); ?></h3>
@@ -117,7 +111,6 @@ $can_act = in_array($est->status, ['SENT','NEEDS_REAPPROVAL'], true);
       </div>
     <?php endif; ?>
 
-    <!-- Accept / Decline with Signature -->
     <div style="margin-top:24px;">
       <?php if ($can_act): ?>
         <div class="arm-approval-box" style="border:1px solid #e5e5e5;border-radius:8px;padding:16px;">
@@ -180,7 +173,6 @@ $can_act = in_array($est->status, ['SENT','NEEDS_REAPPROVAL'], true);
     </div>
   <?php endif; ?>
 
-  <!-- Appointment Booking (initially hidden, shown after approval) -->
   <div id="arm-appointment-form" style="display:none;">
     <h3><?php _e('Book an Appointment','arm-repair-estimates'); ?></h3>
     <label for="arm_appt_date"><?php _e('Choose Date','arm-repair-estimates'); ?></label>
