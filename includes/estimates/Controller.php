@@ -589,6 +589,50 @@ class Controller {
         <?php
     }
 
+    private static function job_block_template() {
+        ob_start();
+        ?>
+        <div class="arm-job-block postbox" data-job-index="__JOB_INDEX__">
+          <div class="postbox-header">
+            <h2 class="hndle"><span><?php esc_html_e('Job', 'arm-repair-estimates'); ?></span></h2>
+          </div>
+          <div class="inside">
+            <p>
+              <label>
+                <?php esc_html_e('Job Title', 'arm-repair-estimates'); ?>
+                <input type="text" name="jobs[__JOB_INDEX__][title]" value="__JOB_TITLE__" class="regular-text arm-job-title">
+              </label>
+              &nbsp;
+              <label>
+                <input type="checkbox" name="jobs[__JOB_INDEX__][is_optional]" value="1" __JOB_OPT_CHECKED__>
+                <?php esc_html_e('Optional Job', 'arm-repair-estimates'); ?>
+              </label>
+            </p>
+            <table class="widefat striped arm-job-items">
+              <thead>
+                <tr>
+                  <th><?php esc_html_e('Type', 'arm-repair-estimates'); ?></th>
+                  <th><?php esc_html_e('Description', 'arm-repair-estimates'); ?></th>
+                  <th><?php esc_html_e('Qty', 'arm-repair-estimates'); ?></th>
+                  <th><?php esc_html_e('Unit Price', 'arm-repair-estimates'); ?></th>
+                  <th><?php esc_html_e('Taxable', 'arm-repair-estimates'); ?></th>
+                  <th><?php esc_html_e('Line Total', 'arm-repair-estimates'); ?></th>
+                  <th><?php esc_html_e('Actions', 'arm-repair-estimates'); ?></th>
+                </tr>
+              </thead>
+              <tbody>
+                __JOB_ROWS__
+              </tbody>
+            </table>
+            <div class="arm-job-footer">
+              <button type="button" class="button arm-add-item"><?php esc_html_e('Add Line Item', 'arm-repair-estimates'); ?></button>
+            </div>
+          </div>
+        </div>
+        <?php
+        return ob_get_clean();
+    }
+
     /** Render a Job block with its items (filtered by job_id) */
     private static function render_job_block($job_id, $title, $is_optional, $sort_order, $all_items) {
         $index = max(0, (int)$sort_order);
