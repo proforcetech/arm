@@ -1,5 +1,5 @@
 (function($){
-  // Simple signature pad (mouse + touch) on a canvas
+
   function SigPad(canvas){
     var ctx = canvas.getContext('2d');
     var drawing = false, last = null;
@@ -34,7 +34,7 @@
 
     this.clear = function(){ ctx.clearRect(0,0,canvas.width,canvas.height); };
     this.isEmpty = function(){
-      // crude heuristic: read a tiny pixel sample
+
       var data = ctx.getImageData(0,0,canvas.width,canvas.height).data;
       for (var i=3;i<data.length;i+=4){ if (data[i] !== 0) return false; }
       return true;

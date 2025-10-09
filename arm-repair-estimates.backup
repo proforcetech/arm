@@ -21,11 +21,11 @@ require_once ARM_RE_PATH.'includes/class-arm-audit.php';
 require_once ARM_RE_PATH.'includes/class-arm-pdf.php';
 require_once ARM_RE_PATH.'includes/class-arm-invoices.php';
 require_once ARM_RE_PATH.'includes/class-arm-bundles.php';
-require_once ARM_RE_PATH.'includes/class-arm-payments.php';  // Stripe
-require_once ARM_RE_PATH.'includes/class-arm-paypal.php';    // PayPal
+require_once ARM_RE_PATH.'includes/class-arm-payments.php';  
+require_once ARM_RE_PATH.'includes/class-arm-paypal.php';    
 require_once ARM_RE_PATH.'includes/class-arm-zoho.php';
-require_once ARM_RE_PATH.'includes/class-arm-export.php';    // CSV
-require_once ARM_RE_PATH.'includes/class-arm-partstech.php'; // VIN + catalog + markup
+require_once ARM_RE_PATH.'includes/class-arm-export.php';    
+require_once ARM_RE_PATH.'includes/class-arm-partstech.php'; 
 
 class ARM_Repair_Estimates {
 
@@ -55,11 +55,11 @@ class ARM_Repair_Estimates {
         ARM_RE_PDF::boot();
         ARM_RE_Invoices::boot();
         ARM_RE_Bundles::boot();
-        ARM_RE_Payments::boot(); // Stripe Checkout + webhook
-        ARM_RE_PayPal::boot();   // PayPal Checkout
-        ARM_RE_Export::boot();   // CSV exports
-        ARM_RE_PartsTech::boot();// VIN decode + search + markup
-        ARM_RE_Zoho::boot();     // CRM pushes
+        ARM_RE_Payments::boot(); 
+        ARM_RE_PayPal::boot();   
+        ARM_RE_Export::boot();   
+        ARM_RE_PartsTech::boot();
+        ARM_RE_Zoho::boot();     
     }
 
     /** ===== Activation / Uninstall ===== */
@@ -72,7 +72,7 @@ class ARM_Repair_Estimates {
         $service_table  = $wpdb->prefix . 'arm_service_types';
         $requests_table = $wpdb->prefix . 'arm_estimate_requests';
 
-        // Vehicle dimension table
+        
         dbDelta("CREATE TABLE $vehicle_table (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             year SMALLINT NOT NULL,
@@ -88,7 +88,7 @@ class ARM_Repair_Estimates {
             KEY yr (year), KEY mk (make), KEY mdl (model), KEY eng (engine), KEY drv (drive), KEY trm (trim)
         ) $charset;");
 
-        // Service types
+        
         dbDelta("CREATE TABLE $service_table (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             name VARCHAR(128) NOT NULL,
@@ -102,7 +102,7 @@ class ARM_Repair_Estimates {
             KEY sort (sort_order)
         ) $charset;");
 
-        // Incoming estimate requests
+        
         dbDelta("CREATE TABLE $requests_table (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             vehicle_year SMALLINT NULL,
@@ -135,7 +135,7 @@ class ARM_Repair_Estimates {
             KEY created_at (created_at)
         ) $charset;");
 
-        // Seed example service types
+        
         $count = (int) $wpdb->get_var("SELECT COUNT(*) FROM $service_table");
         if ($count === 0) {
             $wpdb->insert($service_table, ['name' => 'General Diagnostics', 'is_active' => 1, 'sort_order' => 10]);
@@ -143,9 +143,9 @@ class ARM_Repair_Estimates {
             $wpdb->insert($service_table, ['name' => 'AC Service',           'is_active' => 1, 'sort_order' => 30]);
         }
 
-	// Defaults for new settings
+	
 	if (!get_option('arm_re_tax_apply')) {
-    		update_option('arm_re_tax_apply', 'parts_labor'); // parts_labor | parts_only
+    		update_option('arm_re_tax_apply', 'parts_labor'); 
 	}
 	if (!get_option('arm_re_callout_default')) {
     		update_option('arm_re_callout_default', '0');
@@ -154,7 +154,7 @@ class ARM_Repair_Estimates {
     		update_option('arm_re_mileage_rate_default', '0');
 	}
 
-        // Defaults
+        
         if (!get_option('arm_re_terms_html')) {
             update_option('arm_re_terms_html', '<h3>Terms & Conditions</h3><p><strong>Please read:</strong> Estimates are based on provided information and initial inspection; final pricing may vary after diagnostics.</p>');
         }
@@ -164,18 +164,18 @@ class ARM_Repair_Estimates {
         if (!get_option('arm_re_labor_rate')) update_option('arm_re_labor_rate', 125);
         if (!get_option('arm_re_tax_rate'))   update_option('arm_re_tax_rate', 0);
 
-        // Submodule DB tables
+        
         ARM_RE_Estimates::install_tables();
         ARM_RE_Audit::install_tables();
         ARM_RE_PDF::install_tables();
         ARM_RE_Invoices::install_tables();
         ARM_RE_Bundles::install_tables();
-        ARM_RE_Payments::install_tables(); // no-op safe
-        ARM_RE_PayPal::install_tables();   // no-op safe
+        ARM_RE_Payments::install_tables(); 
+        ARM_RE_PayPal::install_tables();   
     }
 
     public static function uninstall() {
-        // Intentionally keep data on uninstall.
+        
     }
 
     /** ===== Front-end assets ===== */
@@ -386,19 +386,19 @@ class ARM_Repair_Estimates {
             wp_send_json_error(['message' => 'Bad nonce']);
         }
 
-        // Required inputs
+        
         $required = ['first_name','last_name','email','customer_address','customer_city','customer_zip','service_address','service_city','service_zip'];
         foreach ($required as $r) if (empty($_POST[$r])) wp_send_json_error(['message' => 'Missing required fields']);
         if (empty($_POST['terms_accepted'])) wp_send_json_error(['message' => 'Terms not accepted']);
 
-        // Vehicle: either "other" text or full selector chain
+        
         $other = !empty($_POST['vehicle_other']);
         if (!$other) {
             foreach (['vehicle_year','vehicle_make','vehicle_model','vehicle_engine','vehicle_drive','vehicle_trim'] as $r)
                 if (empty($_POST[$r])) wp_send_json_error(['message' => 'Missing vehicle selection']);
         }
 
-        // Delivery prefs
+        
         $del_email = !empty($_POST['delivery_email']) ? 1 : 0;
         $del_sms   = !empty($_POST['delivery_sms']) ? 1 : 0;
         $del_both  = !empty($_POST['delivery_both']) ? 1 : 0;
@@ -438,7 +438,7 @@ class ARM_Repair_Estimates {
         $ok = $wpdb->insert($tbl, $data);
         if (!$ok) wp_send_json_error(['message' => 'DB error']);
 
-        // Email admin notification
+        
         $admin_email = sanitize_email(get_option('arm_re_notify_email', get_option('admin_email')));
         if ($admin_email) {
             $subj = sprintf('[Estimate Request] %s %s', $data['first_name'], $data['last_name']);
@@ -473,28 +473,28 @@ class ARM_Repair_Estimates {
         add_submenu_page('arm-repair-estimates', __('Service Types', 'arm-repair-estimates'), __('Service Types', 'arm-repair-estimates'), 'manage_options', 'arm-repair-services',  [$this, 'page_services']);
         add_submenu_page('arm-repair-estimates', __('Settings', 'arm-repair-estimates'),     __('Settings', 'arm-repair-estimates'),     'manage_options', 'arm-repair-settings',  [$this, 'page_settings']);
 
-        // Estimates builder/admin UI lives in the estimates module
+        
         add_submenu_page('arm-repair-estimates', __('Estimates', 'arm-repair-estimates'), __('Estimates', 'arm-repair-estimates'), 'manage_options', 'arm-repair-estimates-builder', ['ARM_RE_Estimates','render_admin']);
 
-        // (Invoices and Bundles submenus are added by their modules on ::boot())
+        
     }
 
 /** ===== Settings registration ===== */
 public function register_settings() {
-    // Core settings
+    
     register_setting('arm_re_settings', 'arm_re_terms_html',  ['type'=>'string','sanitize_callback'=>'wp_kses_post']);
     register_setting('arm_re_settings', 'arm_re_notify_email',['type'=>'string','sanitize_callback'=>'sanitize_email']);
     register_setting('arm_re_settings', 'arm_re_tax_rate',    ['type'=>'number','sanitize_callback'=>function($v){return is_numeric($v)? $v:0;}]);
     register_setting('arm_re_settings', 'arm_re_labor_rate',  ['type'=>'number','sanitize_callback'=>function($v){return is_numeric($v)? $v:0;}]);
 
-    // Branding
+    
     register_setting('arm_re_settings', 'arm_re_shop_name',    ['type'=>'string','sanitize_callback'=>'sanitize_text_field']);
     register_setting('arm_re_settings', 'arm_re_shop_address', ['type'=>'string','sanitize_callback'=>'wp_kses_post']);
     register_setting('arm_re_settings', 'arm_re_shop_phone',   ['type'=>'string','sanitize_callback'=>'sanitize_text_field']);
     register_setting('arm_re_settings', 'arm_re_shop_email',   ['type'=>'string','sanitize_callback'=>'sanitize_email']);
     register_setting('arm_re_settings', 'arm_re_logo_url',     ['type'=>'string','sanitize_callback'=>'esc_url_raw']);
 
-    // NEW: tax application + travel fee defaults
+    
     register_setting('arm_re_settings', 'arm_re_tax_apply', [
         'type' => 'string',
         'sanitize_callback' => function($v){
@@ -511,7 +511,7 @@ public function register_settings() {
         'sanitize_callback'=>function($v){ return is_numeric($v) ? $v : 0; }
     ]);
 
-    // Delegate config registration to modules
+    
     ARM_RE_Payments::settings_fields();
     ARM_RE_PayPal::settings_fields();
     ARM_RE_Zoho::settings_fields();
@@ -523,7 +523,7 @@ public function register_settings() {
     public function page_settings() {
         ?>
         <div class="wrap">
-          <h1><?php _e('ARM Repair Estimates — Settings', 'arm-repair-estimates'); ?></h1>
+          <h1><?php _e('ARM Repair Estimates Â— Settings', 'arm-repair-estimates'); ?></h1>
           <form method="post" action="options.php">
             <?php settings_fields('arm_re_settings'); ?>
             <table class="form-table" role="presentation">
@@ -562,7 +562,7 @@ public function register_settings() {
 
               <!-- Payments (Stripe) -->
               <tr><th><?php _e('Currency','arm-repair-estimates'); ?></th>
-                  <td><input type="text" name="arm_re_currency" value="<?php echo esc_attr(get_option('arm_re_currency','usd')); ?>" class="small-text"> (usd, cad, …)</td></tr>
+                  <td><input type="text" name="arm_re_currency" value="<?php echo esc_attr(get_option('arm_re_currency','usd')); ?>" class="small-text"> (usd, cad, Â…)</td></tr>
               <tr><th><?php _e('Stripe Publishable Key','arm-repair-estimates'); ?></th>
                   <td><input type="text" name="arm_re_stripe_pk" value="<?php echo esc_attr(get_option('arm_re_stripe_pk','')); ?>" class="regular-text"></td></tr>
               <tr><th><?php _e('Stripe Secret Key','arm-repair-estimates'); ?></th>
@@ -685,9 +685,9 @@ public function register_settings() {
               <tr>
                 <td><?php echo esc_html($r->created_at); ?></td>
                 <td><?php echo esc_html("{$r->first_name} {$r->last_name}"); ?><br><?php echo esc_html($r->email); ?></td>
-                <td><?php echo esc_html($veh ?: '—'); ?></td>
+                <td><?php echo esc_html($veh ?: 'Â—'); ?></td>
                 <td><?php echo esc_html($this->service_name($r->service_type_id)); ?></td>
-                <td><?php echo esc_html($delivery ?: '—'); ?></td>
+                <td><?php echo esc_html($delivery ?: 'Â—'); ?></td>
                 <td><a class="button button-primary" href="<?php echo esc_url($builder_url); ?>"><?php _e('Create Estimate','arm-repair-estimates'); ?></a></td>
               </tr>
             <?php endforeach; else: ?>

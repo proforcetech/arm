@@ -9,19 +9,15 @@ define('ARM_RE_VERSION', '1.2.0');
 define('ARM_RE_PATH', plugin_dir_path(__FILE__));
 define('ARM_RE_URL',  plugin_dir_url(__FILE__));
 
-require_once ARM_RE_PATH.'includes/bootstrap.php';   // sets up autoloading and helpers
-// --- Add this line to load the activator class file ---
+require_once ARM_RE_PATH.'includes/bootstrap.php';
 require_once ARM_RE_PATH . 'includes/install/class-activator.php';
 
-// Activation hooks
 register_activation_hook(__FILE__, ['ARM\\Install\\Activator', 'activate']);
 register_uninstall_hook(__FILE__,  ['ARM\\Install\\Activator', 'uninstall']);
 
-// Run upgrades early so dependent modules operate on the latest schema.
 add_action('plugins_loaded', ['ARM\\Install\\Activator', 'maybe_upgrade'], 1);
 
 
-// Boot in phases (admin vs public)
 add_action('plugins_loaded', function () {
     ARM\Admin\Dashboard::boot();
     ARM\Admin\Menu::boot();
@@ -29,7 +25,7 @@ add_action('plugins_loaded', function () {
     ARM\Admin\Customers::boot();
     ARM\Admin\Settings::boot();
     ARM\Admin\Services::boot();
-    ARM\Admin\Vehicles::boot();               // includes CSV import
+    ARM\Admin\Vehicles::boot();
     ARM\Appointments\Admin::boot();
     ARM\Appointments\Admin_Availability::boot();
 

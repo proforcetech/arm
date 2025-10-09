@@ -32,7 +32,7 @@ final class Admin
     {
         if (strpos($hook, 'arm-appointments') === false) return;
 
-        // CSS is auto-injected by the v6 global bundle; no separate stylesheet enqueue needed.
+        
         wp_enqueue_script('fullcalendar-js', 'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js', [], null, true);
         wp_enqueue_script(
             'arm-appointments-admin',

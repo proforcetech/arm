@@ -1,5 +1,5 @@
 <?php
-// file: includes/integrations/MakeWebhook.php
+
 namespace ARM\Integrations;
 
 if (!defined('ABSPATH')) exit;

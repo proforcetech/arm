@@ -1,5 +1,5 @@
 <?php
-// file: includes/admin/WarrantyClaims.php
+
 namespace ARM\Admin;
 if (!defined('ABSPATH')) exit;
 

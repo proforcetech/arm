@@ -1,15 +1,14 @@
-/* global jQuery, ARM_RE */
 (function bootstrap(factory) {
-  // Ensure jQuery exists (Rocket Loader/async order safe)
+
   if (typeof window.jQuery !== 'undefined') {
     factory(window.jQuery);
   } else {
-    // Try again when DOM is ready
+
     document.addEventListener('DOMContentLoaded', function () {
       if (typeof window.jQuery !== 'undefined') {
         factory(window.jQuery);
       } else {
-        // Last resort: wait a bit for Rocket Loader to release jQuery
+
         var tries = 0, t = setInterval(function () {
           if (typeof window.jQuery !== 'undefined' || ++tries > 20) {
             clearInterval(t);
@@ -23,13 +22,12 @@
 })(function ($) {
   'use strict';
 
-  // If the form isn't on the page, exit early (avoid needless work)
+
   if (!document.getElementById('arm-repair-estimate-form')) return;
 
   const HIER = ['year', 'make', 'model', 'engine', 'drive', 'trim'];
   const IDS = HIER.map(h => '#arm_' + h);
 
-  /** Track latest request per level to avoid race-conditions */
   const pendingKeyByLevel = Object.create(null);
 
   function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
@@ -95,7 +93,7 @@
   }
 
   function ensureConfig(cb) {
-    // Wait for ARM_RE localization; Rocket Loader can reorder localized blocks
+
     if (typeof window.ARM_RE !== 'undefined') return cb();
     var tries = 0, t = setInterval(function () {
       if (typeof window.ARM_RE !== 'undefined' || ++tries > 40) {
@@ -117,7 +115,7 @@
       next: nextLevel
     }, filters || {}))
     .done(function (res) {
-      if (pendingKeyByLevel[nextLevel] !== key) return; // stale response
+      if (pendingKeyByLevel[nextLevel] !== key) return;
       if (res && res.success) {
         setSelectOptions($('#arm_' + nextLevel), res.data.options, 'Select ' + cap(nextLevel));
       } else {
@@ -130,16 +128,16 @@
     });
   }
 
-  // Event wiring (after config present)
+
   ensureConfig(function () {
-    // Initialize Year
+
     if (Array.isArray(window.ARM_RE_INIT_YEARS) && window.ARM_RE_INIT_YEARS.length) {
       setSelectOptions($('#arm_year'), window.ARM_RE_INIT_YEARS, 'Select Year');
     } else {
       fetchOptions('year', {});
     }
 
-    // Dynamic chain
+
     for (let idx = 0; idx < HIER.length; idx++) {
       (function (level, i) {
         $('#arm_' + level).on('change', function () {
@@ -158,24 +156,24 @@
       })(HIER[idx], idx);
     }
 
-    // "Other" vehicle toggle
+
     $('#arm_other_toggle').on('change', function () { toggleOther(this.checked); });
 
-    // Service address sync
+
     $('#arm_same_addr').on('change', syncServiceAddress);
     $('#arm_cust_addr, #arm_cust_city, #arm_cust_zip').on('input', function () {
       if ($('#arm_same_addr').is(':checked')) syncServiceAddress();
     });
 
-    // Delivery normalization
+
     $(document).on('change', '#arm_del_email, #arm_del_sms, #arm_del_both', normalizeDelivery);
 
-    // Initial UI
+
     normalizeDelivery();
     syncServiceAddress();
     toggleOther($('#arm_other_toggle').is(':checked'));
 
-    // Submit
+
     $('#arm-repair-estimate-form').on('submit', function (e) {
       e.preventDefault();
       if (typeof window.ARM_RE === 'undefined' || !ARM_RE.ajax_url) {
@@ -233,7 +231,7 @@
 });
 
 
-// Appointment slot loading
+
 $('#arm_appt_date').on('change', function(){
   var d = $(this).val();
   if (!d) return;

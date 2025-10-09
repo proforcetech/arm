@@ -12,9 +12,8 @@ $shop_email= esc_html(get_option('arm_re_shop_email',''));
 
 $pdf_url   = add_query_arg(['arm_invoice_pdf' => $inv->token], home_url('/'));
 
-// Payment config (Stripe Checkout + PayPal SDK)
-$stripe_checkout   = rest_url('arm/v1/stripe/checkout');       // server returns {url}
-$has_stripe        = (bool) get_option('arm_re_stripe_sk');    // show button only if configured
+$stripe_checkout   = rest_url('arm/v1/stripe/checkout');
+$has_stripe        = (bool) get_option('arm_re_stripe_sk');
 $paypal_client_id  = trim(get_option('arm_re_paypal_client_id',''));
 $paypal_env        = get_option('arm_re_paypal_env','sandbox');
 $paypal_order_api  = rest_url('arm/v1/paypal/order');

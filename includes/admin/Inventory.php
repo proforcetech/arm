@@ -1,5 +1,5 @@
 <?php
-// file: includes/admin/Inventory.php
+
 namespace ARM\Admin;
 
 if (!defined('ABSPATH')) exit;
@@ -252,7 +252,7 @@ final class Inventory
 
         $id   = isset($_POST['id']) ? max(0, (int) $_POST['id']) : 0;
 
-        // Build data map only for existing columns (why: tolerate schema variance)
+        
         $payload = [
             'name'      => sanitize_text_field($_POST['name'] ?? ''),
             'sku'       => sanitize_text_field($_POST['sku'] ?? ''),
@@ -286,7 +286,7 @@ final class Inventory
         }
 
         if ($id > 0) {
-            // Update
+            
             $wpdb->update(
                 $tbl,
                 $data,
@@ -295,7 +295,7 @@ final class Inventory
                 ['%d']
             );
         } else {
-            // Insert
+            
             $wpdb->insert($tbl, $data, $types);
             $id = (int) $wpdb->insert_id;
         }

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 namespace ARM\Vehicles;
 
 if (!defined('ABSPATH')) exit;
@@ -57,7 +57,6 @@ Year,Make,Model,Engine,Drive,Trim
     private static function handle_upload_and_import() {
         if (empty($_FILES['arm_csv']['name'])) return ['ok'=>false,'message'=>__('No file uploaded.','arm-repair-estimates')];
 
-        // Upload file via WP handler
         $overrides = ['test_form' => false, 'mimes'=>['csv'=>'text/csv','txt'=>'text/plain']];
         $upl = wp_handle_upload($_FILES['arm_csv'], $overrides);
         if (!empty($upl['error'])) return ['ok'=>false, 'message'=>$upl['error']];
@@ -76,10 +75,8 @@ Year,Make,Model,Engine,Drive,Trim
 
         while (($row = fgetcsv($fh)) !== false) {
             $line++;
-            // Detect header
             if ($line === 1) {
                 $cols = array_map(function($c){ return strtolower(trim($c)); }, $row);
-                // map indices
                 $need = ['year','make','model','engine','drive','trim'];
                 foreach ($need as $n) {
                     if (!in_array($n, $cols, true)) {
@@ -93,7 +90,6 @@ Year,Make,Model,Engine,Drive,Trim
             $data = self::map_row($cols, $row);
             if (!$data) { $fail++; continue; }
 
-            // Insert IGNORE to respect unique combo
             $sql = $wpdb->prepare(
                 "INSERT IGNORE INTO $tbl (year, make, model, engine, drive, trim, created_at) VALUES (%d,%s,%s,%s,%s,%s,%s)",
                 (int)$data['year'], $data['make'], $data['model'], $data['engine'], $data['drive'], $data['trim'], current_time('mysql')

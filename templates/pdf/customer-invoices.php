@@ -1,7 +1,3 @@
-<?php
-// file: templates/pdf/customer-invoices.php
-// Expects: $rows (array of invoice objects), $customer (object)
-?>
 <html>
 <head>
   <meta charset="utf-8">

@@ -1,5 +1,5 @@
 <?php
-// file: includes/admin/DashboardWidget.php
+
 namespace ARM\Admin;
 
 if (!defined('ABSPATH')) exit;
@@ -28,7 +28,7 @@ final class DashboardWidget
         global $wpdb;
         $tbl = $wpdb->prefix . 'arm_inventory';
 
-        // Safe defaults if table/columns vary by install.
+        
         $col_qty   = self::first_existing_column($tbl, ['qty_on_hand', 'quantity', 'stock_qty']);
         $col_low   = self::first_existing_column($tbl, ['low_stock_threshold', 'reorder_level', 'low_threshold']);
 

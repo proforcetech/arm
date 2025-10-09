@@ -1,5 +1,5 @@
 <?php
-// file: includes/payments/PayPalController.php
+
 namespace ARM\Payments;
 
 if (!defined('ABSPATH')) exit;
@@ -82,13 +82,13 @@ final class PayPalController
         $payload = $req->get_body();
         $headers = [];
 
-        // WP_REST_Request::get_headers returns an array of header name => value(s)
+        
         foreach ($req->get_headers() as $name => $values) {
             $key = strtoupper(str_replace('_', '-', $name));
             $headers[$key] = is_array($values) ? reset($values) : $values;
         }
 
-        // Fallback to superglobal in case server normalises header casing unexpectedly
+        
         foreach ($_SERVER as $key => $value) {
             if (strpos($key, 'HTTP_PAYPAL') === 0) {
                 $normalized = strtoupper(str_replace(['HTTP_', '_'], ['', '-'], $key));

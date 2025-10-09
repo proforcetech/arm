@@ -7,7 +7,7 @@ final class Hooks_Make
 {
     public static function boot(): void
     {
-        add_action('arm/appt/created', [__CLASS__, 'on_created'], 10, 1); // legacy hook name
+        add_action('arm/appt/created', [__CLASS__, 'on_created'], 10, 1); 
         add_action('arm/appointment/booked', [__CLASS__, 'on_created'], 10, 4);
     }
 

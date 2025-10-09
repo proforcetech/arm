@@ -9,15 +9,11 @@ class Controller {
      * Boot: hooks (admin + public actions used by the estimates module)
      * -----------------------------------------------------------------*/
     public static function boot() {
-        // Admin actions
         add_action('admin_post_arm_re_save_estimate',   [__CLASS__, 'handle_save_estimate']);
         add_action('admin_post_arm_re_send_estimate',   [__CLASS__, 'handle_send_estimate']);
         add_action('admin_post_arm_re_mark_status',     [__CLASS__, 'handle_mark_status']);
 
-        // Admin AJAX (customer search for estimate builder)
         add_action('wp_ajax_arm_re_search_customers',   [__CLASS__, 'ajax_search_customers']);
-
-        // Public view & actions booted in PublicView class
     }
 
     /** ----------------------------------------------------------------
@@ -240,7 +236,7 @@ class Controller {
         } elseif (!empty($_GET['from_request'])) {
             $req = $wpdb->get_row($wpdb->prepare("SELECT * FROM $tblR WHERE id=%d", intval($_GET['from_request'])));
             if ($req) {
-                // Prefill a customer (not yet saved)
+                
                 $prefill_customer = [
                     'first_name'=>$req->first_name,'last_name'=>$req->last_name,'email'=>$req->email,'phone'=>$req->phone,
                     'address'=>$req->customer_address,'city'=>$req->customer_city,'zip'=>$req->customer_zip
@@ -248,7 +244,7 @@ class Controller {
             }
         }
 
-        // If editing, load customer record
+        
         $customer = null;
         if ($estimate->customer_id) $customer = $wpdb->get_row($wpdb->prepare("SELECT * FROM $tblC WHERE id=%d", $estimate->customer_id));
 
@@ -349,13 +345,13 @@ class Controller {
 
             <div id="arm-jobs-wrap">
               <?php
-              // Build jobs UI; if no jobs (new estimate), render one empty job with one empty item row.
+              
               if ($jobs) {
                   foreach ($jobs as $j) {
                       self::render_job_block($j->id, $j->title, (int)$j->is_optional, (int)$j->sort_order, $items);
                   }
               } else {
-                  // blank job block (id=0 temp)
+                  
                   self::render_job_block(0, '', 0, 0, []);
               }
               ?>
@@ -623,7 +619,7 @@ class Controller {
                 var $a = $('<a href="#" class="button" style="margin:0 6px 6px 0;"></a>').text('#'+r.id+' '+r.name+'  '+r.email);
                 $a.on('click', function(e){ e.preventDefault();
                   $('#arm-customer-id').val(r.id);
-                  // Fill fields
+                  
                   $('input[name=c_first_name]').val(r.first_name||'');
                   $('input[name=c_last_name]').val(r.last_name||'');
                   $('input[name=c_email]').val(r.email||'');
@@ -692,12 +688,12 @@ class Controller {
 
     /** Render a Job block with its items (filtered by job_id) */
     private static function render_job_block($job_id, $title, $is_optional, $sort_order, $all_items) {
-        $index = max(0, (int)$sort_order); // used as array index for POST
+        $index = max(0, (int)$sort_order); 
         $items = array_filter($all_items, function($it) use ($job_id){
             return (int)$it->job_id === (int)$job_id;
         });
 
-        // When rendering existing items, use sequential row index
+        
         $rows_html = '';
         $rowi = 0;
         if ($items) {
@@ -716,7 +712,7 @@ class Controller {
         echo $html;
     }
 
-     //* Render a single item row for an existing job/item.
+     
     private static function render_item_row($job_index, $row_index, $it = null) {
         $job_index = (int) $job_index;
         $row_index = (int) $row_index;
@@ -755,23 +751,8 @@ class Controller {
     /**
      * Tiny raw template used by inline JS to add rows dynamically.
      */
-/*    public static function item_row_template() {
-        $types = [
-            'LABOR'    => __('Labor', 'arm-repair-estimates'),
-            'PART'     => __('Part', 'arm-repair-estimates'),
-            'FEE'      => __('Fee', 'arm-repair-estimates'),
-            'DISCOUNT' => __('Discount', 'arm-repair-estimates'),
-        ];
 
-        foreach ($types as $key => $label) {
-            $opts .= '<option value="'.esc_attr($key).'">'.esc_html($label).'</option>';
-        }
-*/
-     /* Tiny raw template used by inline JS to add rows dynamically.
-     *
-     * Public so other components (e.g. admin assets) can reuse the template
-     * without duplicating markup or violating visibility constraints.
-     */
+     
 public static function item_row_template() {
     $types = ['LABOR'=>'Labor','PART'=>'Part','FEE'=>'Fee','DISCOUNT'=>'Discount'];
     $opts = '';
@@ -790,26 +771,7 @@ public static function item_row_template() {
 }
 
     /** Tiny raw template used by inline JS to add rows dynamically */
-/*    private static function item_row_template() {
-        $types = ['LABOR'=>'Labor','PART'=>'Part','FEE'=>'Fee','DISCOUNT'=>'Discount'];
-        $opts = '';
-        foreach ($types as $k=>$v) $opts .= '<option value="'.esc_attr($k).'">'.esc_html($v).'</option>';
-        return '<tr>
-          <td><select name="jobs[__JOB_INDEX__][items][__ROW_INDEX__][type]" class="arm-it-type">'.$opts.'</select></td>
-          <td><input type="text" name="jobs[__JOB_INDEX__][items][__ROW_INDEX__][desc]" class="widefat"></td>
-          <td><input type="number" step="0.01" name="jobs[__JOB_INDEX__][items][__ROW_INDEX__][qty]" value="1" class="small-text arm-it-qty"></td>
-          <td><input type="number" step="0.01" name="jobs[__JOB_INDEX__][items][__ROW_INDEX__][price]" value="0.00" class="regular-text arm-it-price"></td>
-          <td><input type="checkbox" name="jobs[__JOB_INDEX__][items][__ROW_INDEX__][taxable]" value="1" checked class="arm-it-taxable"></td>
-          <td class="arm-it-total">0.00</td>
-          <td><button type="button" class="button arm-remove-item">&times;</button></td>
-        </tr>';
-    }
 
-    private static function job_block_template_for_js() {
-        // Not used; we embed via PHP above to keep translations available
-        return '';
-    }
-    */
     /** ----------------------------------------------------------------
      * Handlers
      * -----------------------------------------------------------------*/
@@ -830,7 +792,7 @@ public static function item_row_template() {
         $status = in_array($_POST['status'] ?? 'DRAFT', ['DRAFT','SENT','APPROVED','DECLINED','EXPIRED','NEEDS_REAPPROVAL'], true) ? $_POST['status'] : 'DRAFT';
         $customer_id = intval($_POST['customer_id'] ?? 0);
 
-        // Create/update customer if needed
+        
         $cdata = [
             'first_name'=>sanitize_text_field($_POST['c_first_name'] ?? ''),
             'last_name' =>sanitize_text_field($_POST['c_last_name'] ?? ''),
@@ -842,7 +804,7 @@ public static function item_row_template() {
             'updated_at'=>current_time('mysql')
         ];
         if (!$customer_id) {
-            // If no selected customer but details present, create one
+            
             if (!empty($cdata['first_name']) || !empty($cdata['last_name']) || !empty($cdata['email'])) {
                 $cdata['created_at'] = current_time('mysql');
                 $wpdb->insert($tblC, $cdata);
@@ -851,15 +813,15 @@ public static function item_row_template() {
                 wp_die('Select or create a customer.');
             }
         } else {
-            // Update customer with posted fields (non-destructive enough for admin usage)
+            
             $wpdb->update($tblC, $cdata, ['id'=>$customer_id]);
         }
 
-        // Gather jobs/items from POST; fallback to legacy flat items if needed
+        
         $jobs_post = $_POST['jobs'] ?? null;
-        $prepared_items = [];  // flattened list for totals + insert
-        $jobs_to_insert = [];  // for insert
-        $job_index_to_id = []; // temporary mapping
+        $prepared_items = [];  
+        $jobs_to_insert = [];  
+        $job_index_to_id = []; 
 
         $rowGlobal = 0;
         if (is_array($jobs_post)) {
@@ -883,7 +845,7 @@ public static function item_row_template() {
                 }
             }
         } else {
-            // Legacy flat structure 'items[...]'
+            
             $items = $_POST['items'] ?? [];
             $rowi = 0;
             foreach ($items as $row) {
@@ -900,16 +862,16 @@ public static function item_row_template() {
             $jobs_to_insert[] = ['title'=>__('Job 1','arm-repair-estimates'), 'is_optional'=>0, 'sort'=>0];
         }
 
-        // Call-out / mileage & totals
+        
         $callout_fee   = (float) ($_POST['callout_fee'] ?? 0);
         $mileage_miles = (float) ($_POST['mileage_miles'] ?? 0);
         $mileage_rate  = (float) ($_POST['mileage_rate'] ?? 0);
         $mileage_total = round($mileage_miles * $mileage_rate, 2);
 
         $tax_rate   = (float) ($_POST['tax_rate'] ?? 0);
-        $tax_apply  = get_option('arm_re_tax_apply','parts_labor'); // parts_labor | parts_only
+        $tax_apply  = get_option('arm_re_tax_apply','parts_labor'); 
 
-        // Totals via helper
+        
         $totals = Totals::compute($prepared_items, $tax_rate, $tax_apply, $callout_fee, $mileage_miles, $mileage_rate);
         $subtotal   = $totals['subtotal'];
         $tax_amount = $totals['tax_amount'];
@@ -927,7 +889,7 @@ public static function item_row_template() {
         ];
 
         if ($id) {
-            // Status change on edit of APPROVED ? NEEDS_REAPPROVAL when monetary content changed
+            
             $prev = $wpdb->get_row($wpdb->prepare("SELECT * FROM $tblE WHERE id=%d", $id));
             $wpdb->update($tblE, $data, ['id'=>$id]);
         } else {
@@ -939,11 +901,11 @@ public static function item_row_template() {
             $id = (int)$wpdb->insert_id;
         }
 
-        // Replace jobs/items
+        
         $wpdb->query($wpdb->prepare("DELETE FROM $tblI WHERE estimate_id=%d", $id));
         $wpdb->query($wpdb->prepare("DELETE FROM $tblJ WHERE estimate_id=%d", $id));
 
-        // Insert jobs, keep their DB IDs in the same order as jobs_to_insert indices
+        
         $job_db_ids = [];
         foreach ($jobs_to_insert as $j) {
             $wpdb->insert($tblJ, [
@@ -956,7 +918,7 @@ public static function item_row_template() {
             $job_db_ids[] = (int)$wpdb->insert_id;
         }
 
-        // Insert items with job_id mapping
+        
         foreach ($prepared_items as $pi) {
             $mapped_job_id = $job_db_ids[ $pi['job_local_index'] ] ?? null;
             $wpdb->insert($tblI, [
@@ -972,7 +934,7 @@ public static function item_row_template() {
             ]);
         }
 
-        // If edited from APPROVED and monetary content changed ? revoke approval
+        
         if (!empty($prev) && $prev->status === 'APPROVED') {
             $changed = (abs($prev->subtotal - $subtotal) > 0.009) ||
                        (abs($prev->tax_amount - $tax_amount) > 0.009) ||

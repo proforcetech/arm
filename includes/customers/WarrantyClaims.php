@@ -1,5 +1,5 @@
 <?php
-// file: includes/customers/WarrantyClaims.php
+
 namespace ARM\Customer;
 
 if (!defined('ABSPATH')) exit;
@@ -31,15 +31,15 @@ final class WarrantyClaims
         $tbl_claims = $wpdb->prefix . 'arm_warranty_claims';
         $tbl_msgs   = $wpdb->prefix . 'arm_warranty_claim_messages';
 
-        // Handle reply postback
+        
         if (!empty($_POST['arm_claim_nonce']) && wp_verify_nonce((string) $_POST['arm_claim_nonce'], 'arm_claim_reply')) {
             $claim_id = (int) ($_GET['claim_id'] ?? 0);
             $message  = trim((string) ($_POST['reply_message'] ?? ''));
             if ($claim_id > 0 && $message !== '') {
-                // Ensure ownership by email
+                
                 $owned = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $tbl_claims WHERE id=%d AND email=%s", $claim_id, $email));
                 if ($owned > 0) {
-                    // Prefer messages table; else, update claim last_message/updated_at if columns exist
+                    
                     $has_msgs_table = (int) $wpdb->get_var($wpdb->prepare(
                         "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name=%s", $tbl_msgs
                     )) > 0;
@@ -52,7 +52,7 @@ final class WarrantyClaims
                             'created_at' => current_time('mysql'),
                         ], ['%d','%s','%s','%s']);
                     } else {
-                        // Schema-tolerant update
+                        
                         $cols = array_map('strtolower', $wpdb->get_col(
                             $wpdb->prepare("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME=%s", $tbl_claims)
                         ) ?: []);
@@ -158,7 +158,7 @@ final class WarrantyClaims
             <h3><?php esc_html_e('Conversation', 'arm-repair-estimates'); ?></h3>
             <ul>
               <?php foreach ($convo as $m): ?>
-                <li><em><?php echo esc_html(ucfirst((string) $m->actor)); ?></em> — <small><?php echo esc_html((string) $m->created_at); ?></small><br><?php echo wp_kses_post((string) $m->message); ?></li>
+                <li><em><?php echo esc_html(ucfirst((string) $m->actor)); ?></em> â€” <small><?php echo esc_html((string) $m->created_at); ?></small><br><?php echo wp_kses_post((string) $m->message); ?></li>
               <?php endforeach; ?>
             </ul>
           <?php endif; ?>

@@ -1,7 +1,3 @@
-<?php
-// file: templates/pdf/customer-estimate-single.php
-// Expects: $row (estimate), $customer (object), $items (array of line objects)
-?>
 <html>
 <head>
   <meta charset="utf-8">

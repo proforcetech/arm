@@ -74,9 +74,9 @@ class PayPalController {
         $endpoint = self::base().'/v2/checkout/orders/'.$order_id.'/capture';
         $resp = self::http('POST', $endpoint, (object)[], ['Authorization: Bearer '.$token, 'Content-Type: application/json']);
 
-        // Mark invoice paid if we can resolve reference_id
+        
         if (!empty($resp['status']) && $resp['status'] === 'COMPLETED') {
-            // Find reference_id from purchase_units
+            
             $ref = null;
             if (!empty($resp['purchase_units'][0]['reference_id'])) $ref = (int)$resp['purchase_units'][0]['reference_id'];
             if ($ref) {

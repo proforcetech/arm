@@ -17,7 +17,6 @@ final class Shortlinks {
         add_filter('query_vars',          [__CLASS__, 'register_query_var']);
         add_action('template_redirect',   [__CLASS__, 'maybe_redirect']);
 
-        // Optional: admin-side helper endpoints to create short links on demand
         add_action('admin_post_arm_make_est_short', [__CLASS__, 'admin_make_est_short']);
         add_action('admin_post_arm_make_inv_short', [__CLASS__, 'admin_make_inv_short']);
     }
@@ -43,9 +42,7 @@ final class Shortlinks {
 
     /** Rewrite rules: /estXXXXX and /invXXXXX -> arm_short_code */
     public static function add_rewrite_rules(): void {
-        // capture entire code string into $matches[1]
         add_rewrite_rule('^((?:est|inv)[A-Za-z0-9]+)$', 'index.php?arm_short_code=$matches[1]', 'top');
-        // Optional 2-segment fallback (/est/XXXXX):
         add_rewrite_rule('^(est|inv)/([A-Za-z0-9]+)$', 'index.php?arm_short_code=$matches[1]$matches[2]', 'top');
     }
 
@@ -64,7 +61,6 @@ final class Shortlinks {
             wp_safe_redirect($row->target_url, 302);
             exit;
         }
-        // Not found: 404
         status_header(404);
         wp_die(esc_html__('Link not found.', 'arm-repair-estimates'));
     }
@@ -76,7 +72,6 @@ final class Shortlinks {
         $existing = self::find_by_kind_obj('EST', $estimate_id);
         if ($existing) return home_url('/'.$existing->code);
 
-        // build target and create
         $target = add_query_arg(['arm_estimate' => $token], home_url('/'));
         $code   = self::unique_code('est');
         self::store('EST', $estimate_id, $code, $target);
@@ -158,7 +153,7 @@ final class Shortlinks {
     private static function unique_code(string $prefix): string {
         $prefix = (in_array($prefix, ['est','inv'], true) ? $prefix : 'est');
         do {
-            $rand = strtoupper(self::base36(random_int(1679616, 60466175))); // 5 chars base36
+            $rand = strtoupper(self::base36(random_int(1679616, 60466175)));
             $code = $prefix . $rand;
         } while (self::find_by_code($code));
         return $code;

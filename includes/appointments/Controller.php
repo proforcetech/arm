@@ -12,7 +12,7 @@ final class Controller
 
     public static function register_post_type(): void
     {
-        // Placeholder for future CPT registration.
+        
     }
 
     public static function create(int $customer_id, int $estimate_id, string $start, string $end): int

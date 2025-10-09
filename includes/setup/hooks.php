@@ -1,6 +1,6 @@
 <?php
-// file: includes/setup/hooks.php
-// Why: registers WP hooks for the setup classes in one place.
+
+
 if (!defined('ABSPATH')) exit;
 
 spl_autoload_register(static function($class){
@@ -14,5 +14,5 @@ register_activation_hook(defined('ARM_RE_FILE') ? ARM_RE_FILE : __FILE__, ['ARM\
 register_deactivation_hook(defined('ARM_RE_FILE') ? ARM_RE_FILE : __FILE__, ['ARM\\Setup\\Deactivator', 'deactivate']);
 register_uninstall_hook(defined('ARM_RE_FILE') ? ARM_RE_FILE : __FILE__, ['ARM\\Setup\\Uninstaller', 'uninstall']);
 
-// Cron target
+
 add_action('arm_re_cleanup', ['ARM\\Setup\\Activator', 'cleanup']);

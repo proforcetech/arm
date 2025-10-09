@@ -1,5 +1,5 @@
 <?php
-// file: includes/invoices/class-public-view.php
+
 namespace ARM\Invoices;
 
 if (!defined('ABSPATH')) exit;

@@ -1,7 +1,3 @@
-<?php
-// file: templates/pdf/customer-estimates.php
-// Expects: $rows (array of estimate objects), $customer (object with first_name,last_name)
-?>
 <html>
 <head>
   <meta charset="utf-8">

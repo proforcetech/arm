@@ -1,5 +1,5 @@
 <?php
-// file: includes/admin/Class-Assets.php
+
 namespace ARM\Admin;
 
 if (!defined('ABSPATH')) exit;
@@ -18,7 +18,7 @@ final class Assets {
     public static function enqueue(string $hook): void {
         if (!is_admin()) return;
 
-        // Detect our screens reliably.
+        
         $should_load = false;
         if (function_exists('get_current_screen')) {
             $screen = get_current_screen();
@@ -31,7 +31,7 @@ final class Assets {
         }
         if (!$should_load) return;
 
-        // Version from filemtime when available (why: better cache busting).
+        
         $css_ver = self::asset_version('assets/css/arm-admin.css');
         $js_ver  = self::asset_version('assets/js/arm-admin.js');
 
@@ -50,7 +50,7 @@ final class Assets {
             true
         );
 
-        // Provide common data to JS (why: avoid hardcoding ajax URLs & nonces).
+        
         $ajax_url = admin_url('admin-ajax.php');
 
         wp_localize_script('arm-repair-admin', 'ARM_RE_EST', [

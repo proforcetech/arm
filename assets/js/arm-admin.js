@@ -1,4 +1,3 @@
-/* global jQuery, ARM_RE_EST */
 (function ($) {
   'use strict';
   if (typeof ARM_RE_EST === 'undefined') return;
@@ -39,7 +38,7 @@
     if (taxApply === 'parts_only') {
       return lineType === 'PART';
     }
-    return true; // parts & labor
+    return true;
   }
 
   function recalc() {
@@ -70,20 +69,20 @@
     $('#arm-total').val(total.toFixed(2));
   }
 
-  // Item events
+
   $doc.on('input change', '.arm-it-qty, .arm-it-price, .arm-it-taxable, .arm-it-type', recalc);
 
-  // Add item
+
   $doc.on('click', '#arm-add-item', function () {
     const i = nextIndex();
     $('#arm-items-table tbody').append(rowTemplate(i));
     recalc();
   });
 
-  // Remove item
+
   $doc.on('click', '.arm-remove-item', function () {
     $(this).closest('tr').remove();
-    // Renumber to keep indexes sequential (optional; PHP can handle sparse)
+
     $('#arm-items-table tbody tr').each(function (idx) {
       const $tr = $(this);
       $tr.attr('data-row', idx);
@@ -96,7 +95,7 @@
     recalc();
   });
 
-  // Insert Travel/Call-out fees into items
+
   $doc.on('click', '#arm-insert-travel', function () {
     const calloutAmt = parseNum($('#arm-callout-amount').val());
     const miles = parseNum($('#arm-mileage-miles').val());
@@ -127,7 +126,7 @@
     recalc();
   });
 
-  // Customer typeahead
+
   (function initCustomerSearch(){
     const $box = $('#arm-customer-search');
     const $hid = $('#arm-customer-id');
@@ -151,7 +150,7 @@
 
     $box.on('input', function(){
       const q = $box.val().trim();
-      $hid.val(''); // reset until chosen
+      $hid.val('');
       if (timer) clearTimeout(timer);
       if (q.length < 2) { hideResults(); return; }
 
@@ -189,12 +188,9 @@
     });
   })();
 
-  // Kick off an initial calc after load
+
   $(recalc);
 
-  /** ------------------------------
-   * Invoice admin helpers
-   * ------------------------------ */
   $doc.on('click', '.arm-copy-pay-link', function (e) {
     e.preventDefault();
     const link = $(this).data('pay-link');
@@ -240,9 +236,6 @@
     });
   });
 
-  /** ------------------------------
-   * PartsTech helpers inside builder
-   * ------------------------------ */
   if (integrations.partstech) {
     const vinInput = $('#arm-partstech-vin');
     const vinButton = $('#arm-partstech-vin-btn');

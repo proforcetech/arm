@@ -13,25 +13,25 @@ class Settings {
         register_setting('arm_re_settings', 'arm_re_tax_rate',    ['type'=>'number','sanitize_callback'=>function($v){return is_numeric($v)? $v:0;}]);
         register_setting('arm_re_settings', 'arm_re_labor_rate',  ['type'=>'number','sanitize_callback'=>function($v){return is_numeric($v)? $v:0;}]);
 
-        // Branding
+        
         register_setting('arm_re_settings','arm_re_shop_name',['type'=>'string','sanitize_callback'=>'sanitize_text_field']);
         register_setting('arm_re_settings','arm_re_shop_address',['type'=>'string','sanitize_callback'=>'wp_kses_post']);
         register_setting('arm_re_settings','arm_re_shop_phone',['type'=>'string','sanitize_callback'=>'sanitize_text_field']);
         register_setting('arm_re_settings','arm_re_shop_email',['type'=>'string','sanitize_callback'=>'sanitize_email']);
         register_setting('arm_re_settings','arm_re_logo_url',['type'=>'string','sanitize_callback'=>'esc_url_raw']);
 
-	// Appointments
+	
 	register_setting('arm_re_settings','arm_appt_slot_length',['type'=>'number','default'=>60]);
 	register_setting('arm_re_settings','arm_appt_buffer',['type'=>'number','default'=>0]);
 
 
-        // Payments/Integrations delegate hooks:
+        
         \ARM\Integrations\Payments_Stripe::settings_fields();
         \ARM\Integrations\Payments_PayPal::settings_fields();
         \ARM\Integrations\Zoho::settings_fields();
         \ARM\Integrations\PartsTech::register_settings();
 
-        // New tax application + callout/mileage defaults
+        
         register_setting('arm_re_settings', 'arm_re_tax_apply', [
             'type'=>'string',
             'sanitize_callback'=>function($v){

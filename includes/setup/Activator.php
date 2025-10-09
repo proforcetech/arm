@@ -1,5 +1,5 @@
 <?php
-// file: includes/setup/Activator.php
+
 namespace ARM\Setup;
 
 if (!defined('ABSPATH')) exit;
@@ -27,7 +27,7 @@ final class Activator
     public static function cleanup(): void
     {
         global $wpdb;
-        // Why: avoid bloat from old public submissions.
+        
         $wpdb->query(
             $wpdb->prepare(
                 "DELETE FROM {$wpdb->prefix}arm_estimate_submissions WHERE created_at < (NOW() - INTERVAL %d DAY)",
@@ -41,7 +41,7 @@ final class Activator
     private static function check_requirements_or_die(): void
     {
         global $wp_version;
-        $req_php = '8.0';   // target 8.3+, allow >=8.0
+        $req_php = '8.0';   
         $req_wp  = '6.0';
 
         if (version_compare(PHP_VERSION, $req_php, '<')) {
@@ -68,7 +68,7 @@ final class Activator
 
         $sql = [];
 
-        // Estimates
+        
         $sql[] = "CREATE TABLE {$p}arm_estimates (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             customer_id BIGINT UNSIGNED NULL,
@@ -127,7 +127,7 @@ final class Activator
             KEY idx_created (created_at)
         ) $charset;";
 
-        // Invoices
+        
         $sql[] = "CREATE TABLE {$p}arm_invoices (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             customer_id BIGINT UNSIGNED NULL,
@@ -166,7 +166,7 @@ final class Activator
             KEY idx_invoice (invoice_id)
         ) $charset;";
 
-        // Vehicles
+        
         $sql[] = "CREATE TABLE {$p}arm_vehicle_data (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             year SMALLINT UNSIGNED NOT NULL,
@@ -183,7 +183,7 @@ final class Activator
             KEY idx_model (model)
         ) $charset;";
 
-        // Service types
+        
         $sql[] = "CREATE TABLE {$p}arm_service_types (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             name VARCHAR(191) NOT NULL,
@@ -193,7 +193,7 @@ final class Activator
             KEY idx_active (is_active, sort_order)
         ) $charset;";
 
-        // Appointments
+        
         $sql[] = "CREATE TABLE {$p}arm_appointments (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             customer_id BIGINT UNSIGNED NULL,
@@ -213,7 +213,7 @@ final class Activator
 
     private static function register_default_options(): void
     {
-        add_option('arm_re_labor_rate', '120');         // Why: sensible default
+        add_option('arm_re_labor_rate', '120');         
         add_option('arm_re_tax_rate', '6.0');
         add_option('arm_re_currency', 'usd');
         add_option('arm_re_pay_success', home_url('/'));
@@ -246,7 +246,7 @@ final class Activator
 
     private static function create_pages(): void
     {
-        // Estimate Request page
+        
         if (!get_option('arm_re_page_estimate_form')) {
             $pid = wp_insert_post([
                 'post_title'   => 'Request a Repair Estimate',
@@ -257,7 +257,7 @@ final class Activator
             if (!is_wp_error($pid)) add_option('arm_re_page_estimate_form', (int) $pid);
         }
 
-        // Customer Dashboard page
+        
         if (!get_option('arm_re_page_customer_dashboard')) {
             $pid = wp_insert_post([
                 'post_title'   => 'My Vehicle Service',
@@ -271,7 +271,7 @@ final class Activator
 
     private static function add_roles_and_caps(): void
     {
-        // Why: let staff manage without full admin.
+        
         $caps = [
             'arm_manage_estimates'    => true,
             'arm_manage_invoices'     => true,

@@ -1,7 +1,3 @@
-<?php
-// file: templates/admin/estimate-edit.php
-// Why: simple, safe row template; {{i}} is replaced by JS.
-?>
 <tr>
   <td>
     <select class="arm-part-search" name="items[{{i}}][part_id]" style="width:250px"></select>

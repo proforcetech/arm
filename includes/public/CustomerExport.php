@@ -1,5 +1,5 @@
 <?php
-// file: includes/public/CustomerExport.php
+
 namespace ARM\Public;
 
 if (!defined('ABSPATH')) exit;
@@ -12,8 +12,8 @@ final class CustomerExport
 {
     public static function boot(): void
     {
-        add_action('admin_post_arm_customer_export', [__CLASS__, 'export']);          // logged-in
-        add_action('admin_post_nopriv_arm_customer_export', [__CLASS__, 'deny']);    // not logged-in
+        add_action('admin_post_arm_customer_export', [__CLASS__, 'export']);          
+        add_action('admin_post_nopriv_arm_customer_export', [__CLASS__, 'deny']);    
     }
 
     public static function export(): void

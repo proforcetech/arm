@@ -9,7 +9,7 @@ class Controller {
      * Boot hooks
      * --------------------------------------------------------------*/
     public static function boot() {
-        // Admin UI
+        
         add_action('admin_menu', function () {
             add_submenu_page(
                 'arm-repair-estimates',
@@ -21,7 +21,7 @@ class Controller {
             );
         });
 
-        // AJAX: fetch bundle items for the estimate builder
+        
         add_action('wp_ajax_arm_re_get_bundle_items', [__CLASS__, 'ajax_get_bundle_items']);
     }
 
@@ -88,7 +88,7 @@ class Controller {
         $biT = $wpdb->prefix . 'arm_service_bundle_items';
         $sT  = $wpdb->prefix . 'arm_service_types';
 
-        // Save bundle (+ replace items)
+        
         if (!empty($_POST['arm_bndl_nonce']) && wp_verify_nonce($_POST['arm_bndl_nonce'], 'arm_bndl_save')) {
             $id = (int)($_POST['id'] ?? 0);
             $data = [
@@ -106,7 +106,7 @@ class Controller {
                 $id = (int)$wpdb->insert_id;
             }
 
-            // Replace items
+            
             $wpdb->query($wpdb->prepare("DELETE FROM $biT WHERE bundle_id=%d", $id));
             $items = $_POST['items'] ?? [];
             $i = 0;
@@ -125,7 +125,7 @@ class Controller {
             echo '<div class="updated"><p>' . esc_html__('Saved.','arm-repair-estimates') . '</p></div>';
         }
 
-        // Data for UI
+        
         $services = $wpdb->get_results("SELECT id, name FROM $sT WHERE is_active=1 ORDER BY name ASC");
         $bundles  = $wpdb->get_results("SELECT * FROM $bT ORDER BY sort_order ASC, name ASC");
         ?>
@@ -146,7 +146,7 @@ class Controller {
                 <th><label for="arm_bndl_service_type"><?php _e('Service Type (optional)','arm-repair-estimates'); ?></label></th>
                 <td>
                   <select id="arm_bndl_service_type" name="service_type_id">
-                    <option value=""><?php _e('— none —','arm-repair-estimates'); ?></option>
+                    <option value=""><?php _e('â€” none â€”','arm-repair-estimates'); ?></option>
                     <?php foreach ($services as $s): ?>
                       <option value="<?php echo (int)$s->id; ?>"><?php echo esc_html($s->name); ?></option>
                     <?php endforeach; ?>
@@ -187,7 +187,7 @@ class Controller {
           <h2><?php _e('Existing Bundles','arm-repair-estimates'); ?></h2>
           <ul>
             <?php foreach ($bundles as $b): ?>
-              <li>#<?php echo (int)$b->id; ?> — <?php echo esc_html($b->name); ?> (<?php echo $b->is_active ? esc_html__('Active','arm-repair-estimates') : esc_html__('Inactive','arm-repair-estimates'); ?>)</li>
+              <li>#<?php echo (int)$b->id; ?> â€” <?php echo esc_html($b->name); ?> (<?php echo $b->is_active ? esc_html__('Active','arm-repair-estimates') : esc_html__('Inactive','arm-repair-estimates'); ?>)</li>
             <?php endforeach; ?>
           </ul>
         </div>

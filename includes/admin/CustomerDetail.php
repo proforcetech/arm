@@ -23,7 +23,7 @@ class CustomerDetail {
             return;
         }
 
-        // Handle vehicle add
+        
         if (!empty($_POST['arm_add_vehicle_nonce']) && wp_verify_nonce($_POST['arm_add_vehicle_nonce'], 'arm_add_vehicle')) {
             $data = [
                 'customer_id' => $customer_id,
@@ -41,16 +41,16 @@ class CustomerDetail {
             echo '<div class="updated"><p>Vehicle added successfully.</p></div>';
         }
 
-        // Handle CSV import
+        
         if (!empty($_POST['arm_import_csv_nonce']) && wp_verify_nonce($_POST['arm_import_csv_nonce'], 'arm_import_csv') && !empty($_FILES['csv_file']['tmp_name'])) {
             $handle = fopen($_FILES['csv_file']['tmp_name'], 'r');
             if ($handle) {
                 $row = 0; $imported = 0;
                 while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
                     $row++;
-                    if ($row === 1) continue; // skip header
+                    if ($row === 1) continue; 
                     [$year, $make, $model, $engine, $trim] = array_pad($data, 5, '');
-                    if (!$year || !$make || !$model) continue; // minimal required
+                    if (!$year || !$make || !$model) continue; 
                     $wpdb->insert($tbl_veh, [
                         'customer_id' => $customer_id,
                         'year'        => intval($year),
@@ -72,7 +72,7 @@ class CustomerDetail {
             }
         }
 
-        // Handle CSV export
+        
         if (!empty($_GET['arm_export_csv']) && check_admin_referer('arm_export_csv_'.$customer_id)) {
         $vehicles = $wpdb->get_results($wpdb->prepare(
             "SELECT year, make, model, engine, trim FROM $tbl_veh WHERE customer_id=%d AND (deleted_at IS NULL OR deleted_at='0000-00-00 00:00:00') ORDER BY year DESC, make ASC, model ASC",
@@ -100,14 +100,14 @@ class CustomerDetail {
         echo '<strong>Phone:</strong> ' . esc_html($customer->phone) . '<br>';
         echo '<strong>Address:</strong> ' . esc_html($customer->address . ', ' . $customer->city . ' ' . $customer->zip) . '</p>';
 
-        // Export link
+        
         $export_url = wp_nonce_url(
             add_query_arg(['arm_export_csv'=>1]),
             'arm_export_csv_'.$customer_id
         );
         echo '<p><a href="'.esc_url($export_url).'" class="button">Export Vehicles (CSV)</a></p>';
 
-        // Action buttons
+        
         $new_est_url = admin_url('admin.php?page=arm-repair-estimates-builder&action=new&customer_id='.$customer->id);
         $new_inv_url = admin_url('admin.php?page=arm-repair-invoices&action=new&customer_id='.$customer->id);
 
@@ -116,10 +116,10 @@ class CustomerDetail {
         echo '<a href="'.esc_url($new_inv_url).'" class="button">+ New Invoice</a>';
         echo '</p>';
 
-        // Vehicle history
+        
         echo '<h2>Vehicles</h2>';
 
-        // Add vehicle form
+        
         echo '<h3>Add Vehicle</h3>';
         echo '<form method="post" class="arm-add-vehicle">';
         wp_nonce_field('arm_add_vehicle', 'arm_add_vehicle_nonce');
@@ -133,7 +133,7 @@ class CustomerDetail {
         submit_button('Add Vehicle');
         echo '</form>';
 
-        // CSV import form
+        
         echo '<h3>Import Vehicles from CSV</h3>';
         echo '<form method="post" enctype="multipart/form-data">';
         wp_nonce_field('arm_import_csv', 'arm_import_csv_nonce');
@@ -142,7 +142,7 @@ class CustomerDetail {
         echo '<p class="description">CSV format: year, make, model, engine, trim</p>';
         echo '</form>';
 
-        // Existing vehicles table
+        
         $vehicles = $wpdb->get_results($wpdb->prepare(
             "SELECT * FROM $tbl_veh WHERE customer_id=%d AND (deleted_at IS NULL OR deleted_at='0000-00-00 00:00:00') ORDER BY year DESC, make ASC, model ASC",
             $customer_id
@@ -165,9 +165,9 @@ class CustomerDetail {
             echo '<p>No vehicles saved for this customer.</p>';
         }
 
-        // Estimates and invoices stay the same...
-        // [Code for Estimates and Invoices as in previous version]
+        
+        
 
-        echo '</div>'; // .wrap
+        echo '</div>'; 
     }
 }

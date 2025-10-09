@@ -4,14 +4,14 @@ if (!defined('ABSPATH')) exit;
 
 class Vehicles {
     public static function boot() {
-        // nothing extra yet
+        
     }
 
     public static function render() {
         if (!current_user_can('manage_options')) return;
         global $wpdb; $tbl = $wpdb->prefix.'arm_vehicle_data';
 
-        // Save row
+        
         if (!empty($_POST['arm_vehicle_nonce']) && wp_verify_nonce($_POST['arm_vehicle_nonce'],'arm_vehicle_save')) {
             $id = (int)($_POST['id'] ?? 0);
             $data = [
@@ -27,16 +27,16 @@ class Vehicles {
             else { $data['created_at']=current_time('mysql'); $wpdb->insert($tbl,$data); echo '<div class="updated"><p>Added.</p></div>'; }
         }
 
-        // Delete
+        
         if (!empty($_GET['del']) && !empty($_GET['_wpnonce']) && wp_verify_nonce($_GET['_wpnonce'],'arm_vehicle_del')) {
             $wpdb->delete($tbl, ['id'=>(int)$_GET['del']]); echo '<div class="updated"><p>Deleted.</p></div>';
         }
 
-        // CSV Upload
+        
         if (!empty($_POST['arm_vehicle_csv_nonce']) && wp_verify_nonce($_POST['arm_vehicle_csv_nonce'],'arm_vehicle_csv_upload') && !empty($_FILES['vehicle_csv']['tmp_name'])) {
             $count=0; $fh = fopen($_FILES['vehicle_csv']['tmp_name'],'r');
             if ($fh) {
-                // Expect header: year,make,model,engine,drive,trim
+                
                 $header = fgetcsv($fh);
                 while (($row = fgetcsv($fh)) !== false) {
                     $map = array_combine(array_map('strtolower',$header), $row);

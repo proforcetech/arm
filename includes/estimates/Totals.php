@@ -9,7 +9,7 @@ class Totals {
      */
     public static function compute(array $items, float $tax_rate, float $callout_fee = 0.0, float $mileage_qty = 0.0, float $mileage_rate = 0.0): array {
         $subtotal = 0.0; $taxable_base = 0.0;
-        $apply = get_option('arm_re_tax_apply', 'parts_labor'); // parts_labor|parts_only
+        $apply = get_option('arm_re_tax_apply', 'parts_labor');
 
         foreach ($items as $it) {
             $type = strtoupper($it['type'] ?? 'LABOR');
@@ -26,14 +26,13 @@ class Totals {
 
             $tax_ok = false;
             if ($apply === 'parts_labor') {
-                $tax_ok = $taxable === 1; // respects per-line taxable
-            } else { // parts_only
-                $tax_ok = $taxable === 1 && $is_part; // ignore labor/fees in tax base
+                $tax_ok = $taxable === 1;
+            } else {
+                $tax_ok = $taxable === 1 && $is_part;
             }
-            if ($tax_ok) $taxable_base += max(0, $line); // don't reduce base with discounts here
+            if ($tax_ok) $taxable_base += max(0, $line);
         }
 
-        // add callout & mileage as part of subtotal (fees)
         if ($callout_fee > 0) $subtotal += $callout_fee;
         if ($mileage_rate > 0 && $mileage_qty > 0) $subtotal += ($mileage_rate * $mileage_qty);
 

@@ -9,16 +9,16 @@ if (!defined('ABSPATH')) exit;
 final class Customers {
 
     public static function boot(): void {
-        // Menu
+        
         \add_action('admin_menu', [__CLASS__, 'menu']);
 
-        // Handlers
+        
         \add_action('admin_post_arm_re_customer_save',         [__CLASS__, 'handle_save']);
         \add_action('admin_post_arm_re_customer_delete',       [__CLASS__, 'handle_delete']);
         \add_action('admin_post_arm_re_customer_import_csv',   [__CLASS__, 'handle_import_csv']);
         \add_action('admin_post_arm_re_customer_import_crm',   [__CLASS__, 'handle_import_crm']);
 
-        // AJAX search (for dynamic selectors elsewhere)
+        
         \add_action('wp_ajax_arm_re_customer_search',          [__CLASS__, 'ajax_search']);
     }
 
@@ -43,7 +43,7 @@ final class Customers {
 
         echo '<div class="wrap">';
 
-        // Notices
+        
         if (!empty($_GET['imported'])) {
             echo '<div class="notice notice-success is-dismissible"><p>'
                . esc_html($_GET['imported']) . ' ' . esc_html__('customers imported.', 'arm-repair-estimates')
@@ -114,7 +114,7 @@ final class Customers {
         echo ' <a href="'.esc_url($import_url).'" class="page-title-action">'.esc_html__('Import', 'arm-repair-estimates').'</a>';
         echo '<hr class="wp-header-end">';
 
-        // Search box
+        
         echo '<form method="get" style="margin-bottom:10px;">';
         echo '<input type="hidden" name="page" value="arm-repair-customers">';
         echo '<input type="search" name="s" value="'.esc_attr($q).'" class="regular-text" placeholder="'.esc_attr__('Search name, email, phone', 'arm-repair-estimates').'"> ';
@@ -152,7 +152,7 @@ final class Customers {
         }
         echo '</tbody></table>';
 
-        // Pagination
+        
         if ($pages > 1) {
             echo '<p>';
             for ($i = 1; $i <= $pages; $i++) {
@@ -208,7 +208,7 @@ final class Customers {
 
         echo '<h1>'.esc_html__('Import Customers', 'arm-repair-estimates').'</h1>';
 
-        // CSV
+        
         $csv_nonce = \wp_create_nonce('arm_re_customer_import_csv');
         echo '<h2>'.esc_html__('CSV Import', 'arm-repair-estimates').'</h2>';
         echo '<p>'.esc_html__('Upload a CSV with these headers: first_name,last_name,email,phone,address,city,zip', 'arm-repair-estimates').'</p>';
@@ -221,7 +221,7 @@ final class Customers {
         \submit_button(__('Import CSV', 'arm-repair-estimates'), 'primary', '', false);
         echo '</form>';
 
-        // CRM
+        
         $crm_nonce = \wp_create_nonce('arm_re_customer_import_crm');
         echo '<h2>'.esc_html__('CRM Import', 'arm-repair-estimates').'</h2>';
         echo '<p>'.esc_html__('If your CRM integration is configured (e.g., Zoho), you can pull contacts into the customer list.', 'arm-repair-estimates').'</p>';
@@ -263,7 +263,7 @@ final class Customers {
             $wpdb->update($tbl, $data, ['id' => $id]);
         } else {
             $data['created_at'] = \current_time('mysql');
-            // If email exists, update instead of duplicate
+            
             $exists_id = (int) $wpdb->get_var($wpdb->prepare("SELECT id FROM $tbl WHERE email=%s", $data['email']));
             if ($exists_id) {
                 $wpdb->update($tbl, $data, ['id' => $exists_id]);
@@ -316,7 +316,7 @@ final class Customers {
             self::redirect_with_error(__('Empty CSV.', 'arm-repair-estimates'), 'import');
         }
 
-        // Normalize headers
+        
         $map = self::csv_header_map($header);
         $required = ['email'];
         foreach ($required as $need) {
@@ -342,7 +342,7 @@ final class Customers {
             ];
             if (!$rec['email']) continue;
 
-            // Existing?
+            
             $existing = $wpdb->get_row($wpdb->prepare("SELECT * FROM $tbl WHERE email=%s", $rec['email']), ARRAY_A);
             if ($existing) {
                 if ($update_existing) {
@@ -467,7 +467,7 @@ final class Customers {
         $map = [];
         foreach ($header as $i => $h) {
             $key = strtolower(trim($h));
-            // normalize common aliases
+            
             $key = str_replace([' ', '-'], '_', $key);
             if (in_array($key, ['first_name','firstname'], true)) $key = 'first_name';
             if (in_array($key, ['last_name','lastname'], true))   $key = 'last_name';

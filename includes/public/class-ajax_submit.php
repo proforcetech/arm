@@ -14,11 +14,11 @@ final class Ajax_Submit {
      * Register AJAX routes.
      */
     public static function boot(): void {
-        // Vehicle options (both logged-in and guests)
+        
         \add_action('wp_ajax_arm_get_vehicle_options',        [__CLASS__, 'ajax_get_vehicle_options']);
         \add_action('wp_ajax_nopriv_arm_get_vehicle_options', [__CLASS__, 'ajax_get_vehicle_options']);
 
-        // Public form submission (both logged-in and guests)
+        
         \add_action('wp_ajax_arm_submit_estimate',        [__CLASS__, 'ajax_submit_estimate']);
         \add_action('wp_ajax_nopriv_arm_submit_estimate', [__CLASS__, 'ajax_submit_estimate']);
     }
@@ -39,7 +39,7 @@ final class Ajax_Submit {
             \wp_send_json_error(['message' => 'Invalid level']);
         }
 
-        // Build filters from previous levels only
+        
         $filters = [];
         foreach ($hier as $level) {
             if ($level === $next) break;
@@ -73,7 +73,7 @@ final class Ajax_Submit {
             \wp_send_json_error(['message' => 'Bad nonce']);
         }
 
-        // Required inputs
+        
         $required = [
             'first_name','last_name','email',
             'customer_address','customer_city','customer_zip',
@@ -88,7 +88,7 @@ final class Ajax_Submit {
             \wp_send_json_error(['message' => 'Terms not accepted']);
         }
 
-        // Vehicle must be either "other" text OR the full chain
+        
         $other = !empty($_POST['vehicle_other']);
         if (!$other) {
             foreach (['vehicle_year','vehicle_make','vehicle_model','vehicle_engine','vehicle_drive','vehicle_trim'] as $r) {
@@ -98,7 +98,7 @@ final class Ajax_Submit {
             }
         }
 
-        // Delivery prefs (at least one)
+        
         $del_email = !empty($_POST['delivery_email']) ? 1 : 0;
         $del_sms   = !empty($_POST['delivery_sms'])   ? 1 : 0;
         $del_both  = !empty($_POST['delivery_both'])  ? 1 : 0;
@@ -115,7 +115,7 @@ final class Ajax_Submit {
         $tbl  = $wpdb->prefix . 'arm_estimate_requests';
 
         $data = [
-            // Vehicle
+            
             'vehicle_year'   => $other ? null : (int)($_POST['vehicle_year'] ?? 0),
             'vehicle_make'   => $other ? null : \sanitize_text_field($_POST['vehicle_make'] ?? ''),
             'vehicle_model'  => $other ? null : \sanitize_text_field($_POST['vehicle_model'] ?? ''),
@@ -124,17 +124,17 @@ final class Ajax_Submit {
             'vehicle_trim'   => $other ? null : \sanitize_text_field($_POST['vehicle_trim'] ?? ''),
             'vehicle_other'  => $other ? \sanitize_textarea_field($_POST['vehicle_other']) : null,
 
-            // Service + issue
+            
             'service_type_id'   => !empty($_POST['service_type_id']) ? (int)$_POST['service_type_id'] : null,
             'issue_description' => isset($_POST['issue_description']) ? \wp_kses_post($_POST['issue_description']) : null,
 
-            // Contact
+            
             'first_name' => \sanitize_text_field($_POST['first_name']),
             'last_name'  => \sanitize_text_field($_POST['last_name']),
             'email'      => \sanitize_email($_POST['email']),
             'phone'      => \sanitize_text_field($_POST['phone'] ?? ''),
 
-            // Addresses
+            
             'customer_address' => \sanitize_text_field($_POST['customer_address']),
             'customer_city'    => \sanitize_text_field($_POST['customer_city']),
             'customer_zip'     => \sanitize_text_field($_POST['customer_zip']),
@@ -143,7 +143,7 @@ final class Ajax_Submit {
             'service_city'     => \sanitize_text_field($_POST['service_city']),
             'service_zip'      => \sanitize_text_field($_POST['service_zip']),
 
-            // Delivery + terms
+            
             'delivery_email'  => $del_email,
             'delivery_sms'    => $del_sms,
             'delivery_both'   => $del_both,
@@ -155,7 +155,7 @@ final class Ajax_Submit {
             \wp_send_json_error(['message' => 'DB error']);
         }
 
-        // Email admin notification
+        
         $admin_email = \sanitize_email(\get_option('arm_re_notify_email', \get_option('admin_email')));
         if ($admin_email) {
             $veh = $other

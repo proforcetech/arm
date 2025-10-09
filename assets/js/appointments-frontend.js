@@ -4,7 +4,7 @@ jQuery(function($){
 
     const estimateId = form.data('estimate');
 
-    // Load slots
+
     $.post(ARM_APPT.ajax_url, {
         action: 'arm_get_slots',
         nonce: ARM_APPT.nonce,
@@ -22,7 +22,7 @@ jQuery(function($){
         $('#arm-appointment-slots').html(html);
     });
 
-    // Book slot
+
     form.on('submit', function(e){
         e.preventDefault();
         const sel = $('input[name="slot"]:checked').val();

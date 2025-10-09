@@ -19,7 +19,7 @@ final class Assets {
     public static function enqueue(): void {
         if (!is_singular()) return;
 
-        // These constants are defined in the root plugin file.
+        
         wp_enqueue_style(
             'arm-re-frontend',
             \ARM_RE_URL . 'assets/css/arm-frontend.css',
@@ -56,13 +56,13 @@ final class Assets {
         global $post, $wpdb;
         if (!$post) return;
 
-        // Only if our public form shortcode is present.
+        
         if (!has_shortcode($post->post_content ?? '', 'arm_repair_estimate_form')) return;
 
         $tbl   = $wpdb->prefix . 'arm_vehicle_data';
         $years = $wpdb->get_col("SELECT DISTINCT year FROM $tbl ORDER BY year DESC");
 
-        // Safe JSON injection for the frontend script.
+        
         echo '<script>window.ARM_RE_INIT_YEARS = ' . wp_json_encode(array_values($years)) . ';</script>';
     }
 }
