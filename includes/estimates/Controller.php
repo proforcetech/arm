@@ -591,7 +591,7 @@ class Controller {
 
     /** Render a Job block with its items (filtered by job_id) */
     private static function render_job_block($job_id, $title, $is_optional, $sort_order, $all_items) {
-        $index = max(0, (int)$sort_order); 
+        $index = max(0, (int)$sort_order);
         $items = array_filter($all_items, function($it) use ($job_id){
             return (int)$it->job_id === (int)$job_id;
         });
