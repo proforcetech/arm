@@ -504,19 +504,27 @@ class Controller {
             $('#arm-total-display').text(total.toFixed(2));
           }
 
+          $('#arm-add-job').on('click', function(){
             var idx = nextJobIndex();
             $('#arm-jobs-wrap').append(buildJobHtml(idx));
             recalcTotals();
+          });
+
           $(document).on('click', '.arm-add-item', function(){
+            var $job = $(this).closest('.arm-job-block');
             var idx = parseInt($job.data('job-index'), 10);
             if (isNaN(idx)) {
               idx = nextJobIndex();
               $job.attr('data-job-index', idx);
             }
+            var rowCount = $job.find('tbody tr').length;
             var row = rowTemplate
               .replace(/__JOB_INDEX__/g, idx)
               .replace(/__ROW_INDEX__/g, rowCount);
+            $job.find('tbody').append(row);
             recalcTotals();
+          });
+
           $(document).on('click', '.arm-remove-item', function(){
             $(this).closest('tr').remove();
             recalcTotals();
@@ -531,6 +539,9 @@ class Controller {
               $('#arm-customer-search-btn').trigger('click');
             }
           });
+
+          $('#arm-customer-search-btn').on('click', function(e){
+            e.preventDefault();
             var q = $('#arm-customer-search').val().trim();
             if (!q) {
               return;
@@ -543,6 +554,11 @@ class Controller {
               q: q
             }).done(function(res){
               $out.empty();
+              if (!res || !res.success || !res.data || !res.data.length) {
+                $out.text('<?php echo esc_js(__('No matches.','arm-repair-estimates')); ?>');
+                return;
+              }
+              res.data.forEach(function(r){
                 var label = '#' + r.id + ' ' + (r.name || '').trim();
                 if (r.email) {
                   label += ' ' + r.email;
@@ -550,6 +566,7 @@ class Controller {
                 var $a = $('<a href="#" class="button" style="margin:0 6px 6px 0;"></a>').text(label.trim());
                 $a.on('click', function(ev){
                   ev.preventDefault();
+                  $('#arm-customer-id').val(r.id);
                   $('#arm-customer-fields [name=c_first_name]').val(r.first_name || '');
                   $('#arm-customer-fields [name=c_last_name]').val(r.last_name || '');
                   $('#arm-customer-fields [name=c_email]').val(r.email || '');
@@ -558,81 +575,15 @@ class Controller {
                   $('#arm-customer-fields [name=c_city]').val(r.city || '');
                   $('#arm-customer-fields [name=c_zip]').val(r.zip || '');
                   $out.empty();
-            }).fail(function(){
-              $out.text('<?php echo esc_js(__('Search failed. Please try again.','arm-repair-estimates')); ?>');
-          recalcTotals();
-    /**
-     * Base HTML template for a Job block. Placeholders are replaced at runtime.
-     */
-    private static function job_block_template() {
-        ob_start();
-        ?>
-        <div class="arm-job-block postbox" data-job-index="__JOB_INDEX__">
-          <div class="postbox-header">
-            <h2 class="hndle"><span><?php _e('Job', 'arm-repair-estimates'); ?></span></h2>
-          </div>
-          <div class="inside">
-            <p>
-              <label>
-                <?php _e('Job Title', 'arm-repair-estimates'); ?><br>
-                <input type="text" name="jobs[__JOB_INDEX__][title]" value="__JOB_TITLE__" class="widefat">
-              </label>
-            </p>
-            <p>
-              <label>
-                <input type="checkbox" name="jobs[__JOB_INDEX__][is_optional]" value="1" __JOB_OPT_CHECKED__>
-                <?php _e('Optional job (customer may decline)', 'arm-repair-estimates'); ?>
-              </label>
-            </p>
-            <table class="widefat striped arm-items-table">
-              <thead>
-                <tr>
-                  <th><?php _e('Type', 'arm-repair-estimates'); ?></th>
-                  <th><?php _e('Description', 'arm-repair-estimates'); ?></th>
-                  <th><?php _e('Qty', 'arm-repair-estimates'); ?></th>
-                  <th><?php _e('Unit Price', 'arm-repair-estimates'); ?></th>
-                  <th><?php _e('Taxable', 'arm-repair-estimates'); ?></th>
-                  <th><?php _e('Line Total', 'arm-repair-estimates'); ?></th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                __JOB_ROWS__
-              </tbody>
-            </table>
-            <p>
-              <button type="button" class="button arm-add-item"><?php _e('Add Line Item', 'arm-repair-estimates'); ?></button>
-            </p>
-          </div>
-        </div>
-        <?php
-        return ob_get_clean();
-    }
-
-            $.post(ajaxurl, { action:'arm_re_search_customers', _ajax_nonce:'<?php echo wp_create_nonce('arm_re_est_admin'); ?>', q:q }, function(res){
-              var $out = $('#arm-customer-results').empty();
-              if (!res || !res.success || !res.data || !res.data.length) {
-                $out.text('<?php echo esc_js(__('No matches.','arm-repair-estimates')); ?>');
-                return;
-              }
-              res.data.forEach(function(r){
-                var $a = $('<a href="#" class="button" style="margin:0 6px 6px 0;"></a>').text('#'+r.id+' '+r.name+'  '+r.email);
-                $a.on('click', function(e){ e.preventDefault();
-                  $('#arm-customer-id').val(r.id);
-                  
-                  $('input[name=c_first_name]').val(r.first_name||'');
-                  $('input[name=c_last_name]').val(r.last_name||'');
-                  $('input[name=c_email]').val(r.email||'');
-                  $('input[name=c_phone]').val(r.phone||'');
-                  $('input[name=c_address]').val(r.address||'');
-                  $('input[name=c_city]').val(r.city||'');
-                  $('input[name=c_zip]').val(r.zip||'');
                 });
                 $out.append($a);
               });
+            }).fail(function(){
+              $out.text('<?php echo esc_js(__('Search failed. Please try again.','arm-repair-estimates')); ?>');
             });
           });
 
+          recalcTotals();
         })(jQuery);
         </script>
         <?php
@@ -688,7 +639,7 @@ class Controller {
 
     /** Render a Job block with its items (filtered by job_id) */
     private static function render_job_block($job_id, $title, $is_optional, $sort_order, $all_items) {
-        $index = max(0, (int)$sort_order); 
+        $index = max(0, (int)$sort_order);
         $items = array_filter($all_items, function($it) use ($job_id){
             return (int)$it->job_id === (int)$job_id;
         });
