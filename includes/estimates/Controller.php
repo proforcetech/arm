@@ -816,10 +816,9 @@ public static function item_row_template() {
         $mileage_total = round($mileage_miles * $mileage_rate, 2);
 
         $tax_rate   = (float) ($_POST['tax_rate'] ?? 0);
-        $tax_apply  = get_option('arm_re_tax_apply','parts_labor'); 
 
-        
-        $totals = Totals::compute($prepared_items, $tax_rate, $tax_apply, $callout_fee, $mileage_miles, $mileage_rate);
+
+        $totals = Totals::compute($prepared_items, $tax_rate, $callout_fee, $mileage_miles, $mileage_rate);
         $subtotal   = $totals['subtotal'];
         $tax_amount = $totals['tax_amount'];
         $total      = $totals['total'];
