@@ -33,7 +33,11 @@ class PartsTech {
 
     public static function ajax_vin(): void {
         if (!current_user_can('manage_options')) wp_send_json_error(['error' => 'forbidden'], 403);
-        check_ajax_referer('arm_re_est_admin');
+
+        $nonce = $_REQUEST['_ajax_nonce'] ?? $_REQUEST['nonce'] ?? '';
+        if (!wp_verify_nonce($nonce, 'arm_re_est_admin')) {
+            wp_send_json_error(['error' => 'invalid_nonce'], 403);
+        }
         $vin = strtoupper(sanitize_text_field($_POST['vin'] ?? ''));
         if ($vin === '') wp_send_json_error(['error' => 'missing vin'], 400);
         $resp = self::request('GET', '/catalog/v1/vehicles/lookup', ['vin' => $vin]);
@@ -54,7 +58,11 @@ class PartsTech {
 
     public static function ajax_search(): void {
         if (!current_user_can('manage_options')) wp_send_json_error(['error' => 'forbidden'], 403);
-        check_ajax_referer('arm_re_est_admin');
+
+        $nonce = $_REQUEST['_ajax_nonce'] ?? $_REQUEST['nonce'] ?? '';
+        if (!wp_verify_nonce($nonce, 'arm_re_est_admin')) {
+            wp_send_json_error(['error' => 'invalid_nonce'], 403);
+        }
         $query = sanitize_text_field($_POST['query'] ?? '');
         if ($query === '') wp_send_json_error(['error' => 'query required'], 400);
         $vehicle = isset($_POST['vehicle']) && is_array($_POST['vehicle']) ? array_map('sanitize_text_field', $_POST['vehicle']) : [];

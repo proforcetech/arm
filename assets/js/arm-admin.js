@@ -127,6 +127,257 @@
   });
 
 
+  (function initVehicleSelectors(){
+    const $year = $('#arm-vehicle-year');
+    if (!$year.length) return;
+
+    const config = (window.ARM_RE_EST && ARM_RE_EST.vehicleInit) || {};
+    const supports = config.supports || {};
+    const supportsTrans = !!supports.transmission;
+    const HIER = ['year','make','model','engine','transmission','drive','trim'];
+    const selects = {};
+    HIER.forEach(function(level){ selects[level] = $('#arm-vehicle-' + level); });
+
+    const $otherToggle = $('#arm-vehicle-other-toggle');
+    const $otherInput  = $('#arm-vehicle-other');
+
+    const pending = Object.create(null);
+    let initializing = true;
+    let selected = $.extend({}, config.selected || {});
+
+    function placeholder(level) {
+      const $sel = selects[level];
+      if ($sel && $sel.length) {
+        const ph = $sel.data('placeholder');
+        if (ph) return ph;
+      }
+      const cap = level.charAt(0).toUpperCase() + level.slice(1);
+      return 'Select ' + cap;
+    }
+
+    function setSelectOptions(level, options, selectedVal) {
+      const $sel = selects[level];
+      if (!$sel || !$sel.length) return;
+      const label = placeholder(level);
+      const $ph = $('<option>').val('').text(label);
+      $sel.empty().append($ph);
+      if (Array.isArray(options) && options.length) {
+        options.forEach(function(opt){
+          $sel.append($('<option>').val(opt).text(opt));
+        });
+        $sel.prop('disabled', false);
+      } else {
+        $sel.prop('disabled', true);
+      }
+      if (selectedVal) {
+        const has = $sel.find('option').filter(function(){ return $(this).val() === selectedVal; }).length > 0;
+        if (!has) {
+          $sel.append($('<option>').val(selectedVal).text(selectedVal));
+        }
+        $sel.val(selectedVal);
+      } else {
+        $sel.val('');
+      }
+      if (!supportsTrans && level === 'transmission') {
+        $sel.prop('disabled', true);
+      }
+    }
+
+    function clearDownstream(fromIdx) {
+      for (let i = fromIdx + 1; i < HIER.length; i++) {
+        const lvl = HIER[i];
+        setSelectOptions(lvl, [], null);
+        pending[lvl] = null;
+      }
+    }
+
+    function gatherFilters(idx) {
+      const filters = {};
+      for (let j = 0; j <= idx; j++) {
+        const lvl = HIER[j];
+        if (!supportsTrans && lvl === 'transmission') continue;
+        const $sel = selects[lvl];
+        if (!$sel || !$sel.length) continue;
+        const val = $sel.val();
+        if (!val) return null;
+        filters[lvl] = val;
+      }
+      return filters;
+    }
+
+    function fetchOptions(level, filters) {
+      const $sel = selects[level];
+      if (!$sel || !$sel.length) return $.Deferred().resolve().promise();
+      if (level === 'transmission' && !supportsTrans) {
+        setSelectOptions('transmission', [], selected.transmission || '');
+        return $.Deferred().resolve().promise();
+      }
+      const key = level + '|' + JSON.stringify(filters || {});
+      pending[level] = key;
+      return $.post(ARM_RE_EST.ajax_url, $.extend({
+        action: 'arm_re_vehicle_options',
+        nonce: ARM_RE_EST.nonce,
+        next: level
+      }, filters || {})).done(function(res){
+        if (pending[level] !== key) return;
+        const initialVal = initializing ? (selected[level] || '') : '';
+        if (res && res.success && res.data && Array.isArray(res.data.options)) {
+          setSelectOptions(level, res.data.options, initialVal);
+        } else {
+          setSelectOptions(level, [], null);
+        }
+      }).fail(function(){
+        if (pending[level] !== key) return;
+        setSelectOptions(level, [], null);
+      });
+    }
+
+    function preselectFrom(idx) {
+      const d = $.Deferred();
+
+      function step(currentIdx) {
+        if (currentIdx >= HIER.length - 1) {
+          d.resolve();
+          return;
+        }
+        let nextIdx = currentIdx + 1;
+        while (!supportsTrans && HIER[nextIdx] === 'transmission') {
+          setSelectOptions('transmission', [], selected.transmission || '');
+          nextIdx++;
+          if (nextIdx >= HIER.length) {
+            d.resolve();
+            return;
+          }
+        }
+        const filters = gatherFilters(currentIdx);
+        if (!filters) {
+          d.resolve();
+          return;
+        }
+        const lvl = HIER[nextIdx];
+        fetchOptions(lvl, filters).always(function(){
+          step(nextIdx);
+        });
+      }
+
+      step(idx);
+      return d.promise();
+    }
+
+    function toggleOther(on) {
+      if (on) {
+        HIER.forEach(function(lvl){
+          const $sel = selects[lvl];
+          if ($sel && $sel.length) {
+            $sel.prop('disabled', true);
+          }
+        });
+        $otherInput.show();
+      } else {
+        HIER.forEach(function(lvl){
+          const $sel = selects[lvl];
+          if (!$sel || !$sel.length) return;
+          if (!supportsTrans && lvl === 'transmission') {
+            $sel.prop('disabled', true);
+          } else if ($sel.find('option').length > 1) {
+            $sel.prop('disabled', false);
+          }
+        });
+        $otherInput.hide();
+      }
+    }
+
+    HIER.forEach(function(level, idx){
+      const $sel = selects[level];
+      if (!$sel || !$sel.length) return;
+      $sel.on('change', function(){
+        selected[level] = $(this).val();
+        if (initializing) return;
+        clearDownstream(idx);
+        if (idx >= HIER.length - 1) return;
+        const filters = gatherFilters(idx);
+        if (!filters) return;
+        let nextIdx = idx + 1;
+        while (!supportsTrans && HIER[nextIdx] === 'transmission') {
+          setSelectOptions('transmission', [], selected.transmission || '');
+          nextIdx++;
+          if (nextIdx >= HIER.length) return;
+        }
+        const nextLevel = HIER[nextIdx];
+        fetchOptions(nextLevel, filters);
+      });
+    });
+
+    const otherVal = (selected.other || '').trim();
+    selected.other = otherVal;
+
+    if (otherVal) {
+      toggleOther(true);
+      $otherToggle.prop('checked', true);
+      $otherInput.val(otherVal);
+      initializing = false;
+      return;
+    }
+
+    toggleOther(false);
+
+    const years = Array.isArray(config.years) ? config.years : [];
+    if (years.length) {
+      setSelectOptions('year', years, selected.year || '');
+      preselectFrom(0).always(function(){ initializing = false; });
+    } else {
+      setSelectOptions('year', [], selected.year || '');
+      fetchOptions('year', {}).always(function(){
+        const val = selected.year || '';
+        if (val) {
+          const $sel = selects.year;
+          if ($sel && $sel.length) {
+            const has = $sel.find('option').filter(function(){ return $(this).val() === val; }).length > 0;
+            if (!has) {
+              $sel.append($('<option>').val(val).text(val));
+            }
+            $sel.val(val);
+          }
+        }
+        preselectFrom(0).always(function(){ initializing = false; });
+      });
+    }
+
+    $otherToggle.on('change', function(){
+      const on = $(this).is(':checked');
+      if (on) {
+        toggleOther(true);
+      } else {
+        selected.other = '';
+        $otherInput.val('');
+        selected = {};
+        toggleOther(false);
+        initializing = true;
+        const initYears = Array.isArray(config.years) ? config.years : [];
+        if (initYears.length) {
+          setSelectOptions('year', initYears, '');
+          preselectFrom(0).always(function(){ initializing = false; });
+        } else {
+          setSelectOptions('year', [], '');
+          fetchOptions('year', {}).always(function(){
+            initializing = false;
+          });
+        }
+      }
+    });
+
+    $otherInput.on('input', function(){
+      if ($otherToggle.is(':checked')) {
+        selected.other = $(this).val();
+      }
+    });
+
+    if (!supportsTrans) {
+      setSelectOptions('transmission', [], selected.transmission || '');
+    }
+  })();
+
+
   (function initCustomerSearch(){
     const $box = $('#arm-customer-search');
     const $hid = $('#arm-customer-id');
