@@ -65,7 +65,10 @@ class Controller {
      * --------------------------------------------------------------*/
     public static function ajax_get_bundle_items() {
         if (!current_user_can('manage_options')) wp_send_json_error();
-        check_ajax_referer('arm_re_est_admin', '_ajax_nonce');
+        $nonce = $_REQUEST['_ajax_nonce'] ?? $_REQUEST['nonce'] ?? '';
+        if (!wp_verify_nonce($nonce, 'arm_re_est_admin')) {
+            wp_send_json_error(['error' => 'invalid_nonce'], 403);
+        }
 
         global $wpdb;
         $id  = (int)($_POST['bundle_id'] ?? 0);

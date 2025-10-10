@@ -948,8 +948,12 @@ public static function item_row_template() {
 
     /** Customer search (email/phone/name) */
     public static function ajax_search_customers() {
-        if (!current_user_can('manage_options')) wp_send_json_error();
-        check_ajax_referer('arm_re_est_admin');
+        if (!current_user_can('manage_options')) wp_send_json_error(['error' => 'forbidden'], 403);
+
+        $nonce = $_REQUEST['_ajax_nonce'] ?? $_REQUEST['nonce'] ?? '';
+        if (!wp_verify_nonce($nonce, 'arm_re_est_admin')) {
+            wp_send_json_error(['error' => 'invalid_nonce'], 403);
+        }
         global $wpdb; $tbl = $wpdb->prefix.'arm_customers';
         $q = trim(sanitize_text_field($_POST['q'] ?? ''));
         if ($q === '') wp_send_json_success([]);
