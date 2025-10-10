@@ -816,10 +816,9 @@ public static function item_row_template() {
         $mileage_total = round($mileage_miles * $mileage_rate, 2);
 
         $tax_rate   = (float) ($_POST['tax_rate'] ?? 0);
-        $tax_apply  = get_option('arm_re_tax_apply','parts_labor'); 
 
-        
-        $totals = Totals::compute($prepared_items, $tax_rate, $tax_apply, $callout_fee, $mileage_miles, $mileage_rate);
+
+        $totals = Totals::compute($prepared_items, $tax_rate, $callout_fee, $mileage_miles, $mileage_rate);
         $subtotal   = $totals['subtotal'];
         $tax_amount = $totals['tax_amount'];
         $total      = $totals['total'];
@@ -948,8 +947,12 @@ public static function item_row_template() {
 
     /** Customer search (email/phone/name) */
     public static function ajax_search_customers() {
-        if (!current_user_can('manage_options')) wp_send_json_error();
-        check_ajax_referer('arm_re_est_admin');
+        if (!current_user_can('manage_options')) wp_send_json_error(['error' => 'forbidden'], 403);
+
+        $nonce = $_REQUEST['_ajax_nonce'] ?? $_REQUEST['nonce'] ?? '';
+        if (!wp_verify_nonce($nonce, 'arm_re_est_admin')) {
+            wp_send_json_error(['error' => 'invalid_nonce'], 403);
+        }
         global $wpdb; $tbl = $wpdb->prefix.'arm_customers';
         $q = trim(sanitize_text_field($_POST['q'] ?? ''));
         if ($q === '') wp_send_json_success([]);

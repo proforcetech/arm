@@ -429,9 +429,12 @@ final class Customers {
 
     /** ===== AJAX search for customers (admin use & estimate builder search) ===== */
     public static function ajax_search(): void {
-        \check_ajax_referer('arm_re_est_admin', 'nonce');
+        $nonce = $_REQUEST['_ajax_nonce'] ?? $_REQUEST['nonce'] ?? '';
+        if (!\wp_verify_nonce($nonce, 'arm_re_est_admin')) {
+            \wp_send_json_error(['error' => 'invalid_nonce'], 403);
+        }
 
-        if (!\current_user_can('manage_options')) \wp_send_json_error();
+        if (!\current_user_can('manage_options')) \wp_send_json_error(['error' => 'forbidden'], 403);
         $term = isset($_REQUEST['q']) ? \sanitize_text_field($_REQUEST['q']) : '';
         global $wpdb;
         $tbl = $wpdb->prefix . 'arm_customers';
