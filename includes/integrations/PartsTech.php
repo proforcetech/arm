@@ -45,6 +45,9 @@ class PartsTech {
         if (empty($resp['data'])) wp_send_json_error(['error' => 'no results'], 404);
         $vehicle = $resp['data'];
         $label = trim(($vehicle['year'] ?? '') . ' ' . ($vehicle['make'] ?? '') . ' ' . ($vehicle['model'] ?? ''));
+        $trans = $vehicle['transmission'] ?? ($vehicle['transmissionDescription'] ?? '');
+        $drive = $vehicle['drive'] ?? ($vehicle['drivetrain'] ?? ($vehicle['drivetrainDescription'] ?? ''));
+        $trim  = $vehicle['trim'] ?? ($vehicle['subModel'] ?? ($vehicle['trimDescription'] ?? ''));
         wp_send_json_success([
             'label' => $label,
             'vehicle' => [
@@ -52,6 +55,9 @@ class PartsTech {
                 'make'  => $vehicle['make'] ?? '',
                 'model' => $vehicle['model'] ?? '',
                 'engine'=> $vehicle['engine'] ?? '',
+                'transmission' => $trans,
+                'drive' => $drive,
+                'trim' => $trim,
             ]
         ]);
     }

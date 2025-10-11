@@ -79,6 +79,10 @@ final class Activator
             vehicle_year SMALLINT UNSIGNED NULL,
             vehicle_make VARCHAR(80) NULL,
             vehicle_model VARCHAR(120) NULL,
+            vehicle_engine VARCHAR(120) NULL,
+            vehicle_transmission VARCHAR(80) NULL,
+            vehicle_drive VARCHAR(80) NULL,
+            vehicle_trim VARCHAR(120) NULL,
             vin VARCHAR(32) NULL,
             plate VARCHAR(32) NULL,
             status VARCHAR(40) NOT NULL DEFAULT 'DRAFT',
@@ -173,14 +177,16 @@ final class Activator
             make VARCHAR(80) NOT NULL,
             model VARCHAR(120) NOT NULL,
             engine VARCHAR(120) NOT NULL,
+            transmission VARCHAR(80) NOT NULL,
             drive VARCHAR(80) NOT NULL,
             trim  VARCHAR(120) NOT NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
-            UNIQUE KEY uniq_vehicle (year, make, model, engine, drive, trim),
+            UNIQUE KEY uniq_vehicle (year, make, model, engine, transmission, drive, trim),
             KEY idx_year (year),
             KEY idx_make (make),
-            KEY idx_model (model)
+            KEY idx_model (model),
+            KEY idx_trans (transmission)
         ) $charset;";
 
         

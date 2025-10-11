@@ -268,6 +268,9 @@
           $('#arm-vehicle-make').val(data.vehicle.make || '');
           $('#arm-vehicle-model').val(data.vehicle.model || '');
           $('#arm-vehicle-engine').val(data.vehicle.engine || '');
+          $('#arm-vehicle-transmission').val(data.vehicle.transmission || '');
+          $('#arm-vehicle-drive').val(data.vehicle.drive || '');
+          $('#arm-vehicle-trim').val(data.vehicle.trim || '');
         }
       }).fail(function () {
         vinButton.prop('disabled', false);

@@ -100,7 +100,11 @@ class Shortcode_Form {
         check_ajax_referer('arm_re_nonce','nonce');
         global $wpdb;
         $tbl = $wpdb->prefix.'arm_vehicle_data';
-        $hier = ['year','make','model','engine','drive','trim'];
+        $include_trans = !empty($_POST['include_transmission']) && current_user_can('manage_options');
+        $hier = ['year','make','model','engine'];
+        if ($include_trans) $hier[] = 'transmission';
+        $hier[] = 'drive';
+        $hier[] = 'trim';
         $next = sanitize_text_field($_POST['next'] ?? '');
         if (!in_array($next, $hier, true)) wp_send_json_error(['message'=>'Invalid level']);
 
