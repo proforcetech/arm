@@ -35,6 +35,24 @@ final class Assets {
         $css_ver = self::asset_version('assets/css/arm-admin.css');
         $js_ver  = self::asset_version('assets/js/arm-admin.js');
 
+        global $wpdb;
+
+        $vehicle_years = [];
+        if ($wpdb instanceof \wpdb) {
+            $vehicle_table = $wpdb->prefix . 'arm_vehicle_data';
+            $table_like    = $wpdb->esc_like($vehicle_table);
+            $table_exists  = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table_like));
+
+            if (!empty($table_exists)) {
+                $vehicle_years = $wpdb->get_col("SELECT DISTINCT year FROM {$vehicle_table} ORDER BY year DESC");
+            }
+        }
+
+        $vehicle_years = array_map('strval', array_filter((array) $vehicle_years, static function ($year) {
+            return $year !== null && $year !== '';
+        }));
+        $vehicle_years_json = $vehicle_years ? wp_json_encode(array_values($vehicle_years)) : '';
+
         wp_enqueue_style(
             'arm-repair-admin',
             \ARM_RE_URL . 'assets/css/arm-admin.css',
@@ -76,6 +94,11 @@ final class Assets {
             'partstech' => [
                 'vin'    => add_query_arg(['action' => 'arm_partstech_vin'], $ajax_url),
                 'search' => add_query_arg(['action' => 'arm_partstech_search'], $ajax_url),
+            ],
+            'vehicle' => [
+                'ajax_url' => $ajax_url,
+                'nonce'    => wp_create_nonce('arm_re_nonce'),
+                'years'    => $vehicle_years_json,
             ],
             'itemRowTemplate' => \ARM\Estimates\Controller::item_row_template(),
             'i18n' => [
