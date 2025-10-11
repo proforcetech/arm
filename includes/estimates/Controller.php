@@ -213,7 +213,7 @@ class Controller {
         $tblI = $wpdb->prefix.'arm_estimate_items';
         $tblJ = $wpdb->prefix.'arm_estimate_jobs';
         $tblR = $wpdb->prefix.'arm_estimate_requests';
-        $tblV = $wpdb->prefix.'arm_vehicles';
+        $req  = null;
 
         $defaults = [
             'id'=>0,
@@ -242,37 +242,43 @@ class Controller {
         $estimate = (object)$defaults;
         $jobs = [];
         $items = [];
-        $prefill_vehicle = null;
+        $prefill_vehicle = [
+            'year' => '',
+            'make' => '',
+            'model'=> '',
+            'engine'=> '',
+            'transmission' => '',
+            'drive' => '',
+            'trim' => '',
+        ];
 
         if ($id) {
             $estimate = $wpdb->get_row($wpdb->prepare("SELECT * FROM $tblE WHERE id=%d", $id));
             if (!$estimate) { echo '<div class="notice notice-error"><p>Estimate not found.</p></div>'; return; }
             $jobs = $wpdb->get_results($wpdb->prepare("SELECT * FROM $tblJ WHERE estimate_id=%d ORDER BY sort_order ASC, id ASC", $id));
             $items= $wpdb->get_results($wpdb->prepare("SELECT * FROM $tblI WHERE estimate_id=%d ORDER BY sort_order ASC, id ASC", $id));
-        } else {
-            if (!empty($_GET['from_request'])) {
-                $req = $wpdb->get_row($wpdb->prepare("SELECT * FROM $tblR WHERE id=%d", intval($_GET['from_request'])));
-                if ($req) {
-                    $prefill_customer = [
-                        'first_name'=>$req->first_name,'last_name'=>$req->last_name,'email'=>$req->email,'phone'=>$req->phone,
-                        'address'=>$req->customer_address,'city'=>$req->customer_city,'zip'=>$req->customer_zip
-                    ];
-                    $prefill_vehicle = [
-                        'vehicle_year' => $req->vehicle_year,
-                        'vehicle_make' => $req->vehicle_make,
-                        'vehicle_model'=> $req->vehicle_model,
-                        'vehicle_engine'=> $req->vehicle_engine,
-                        'vehicle_transmission' => $req->vehicle_transmission ?? '',
-                        'vehicle_drive' => $req->vehicle_drive,
-                        'vehicle_trim'  => $req->vehicle_trim,
-                    ];
-                }
-            }
-            if (!$prefill_vehicle && !empty($_GET['vehicle_id'])) {
-                $veh = $wpdb->get_row($wpdb->prepare("SELECT year AS vehicle_year, make AS vehicle_make, model AS vehicle_model, engine AS vehicle_engine, '' AS vehicle_transmission, '' AS vehicle_drive, trim AS vehicle_trim FROM $tblV WHERE id=%d", intval($_GET['vehicle_id'])));
-                if ($veh) {
-                    $prefill_vehicle = (array)$veh;
-                }
+            $prefill_vehicle['year'] = isset($estimate->vehicle_year) ? (string) $estimate->vehicle_year : '';
+            $prefill_vehicle['make'] = isset($estimate->vehicle_make) ? (string) $estimate->vehicle_make : '';
+            $prefill_vehicle['model']= isset($estimate->vehicle_model) ? (string) $estimate->vehicle_model : '';
+            $prefill_vehicle['engine']= isset($estimate->vehicle_engine) ? (string) $estimate->vehicle_engine : '';
+            $prefill_vehicle['transmission'] = isset($estimate->vehicle_transmission) ? (string) $estimate->vehicle_transmission : '';
+            $prefill_vehicle['drive'] = isset($estimate->vehicle_drive) ? (string) $estimate->vehicle_drive : '';
+            $prefill_vehicle['trim'] = isset($estimate->vehicle_trim) ? (string) $estimate->vehicle_trim : '';
+        } elseif (!empty($_GET['from_request'])) {
+            $req = $wpdb->get_row($wpdb->prepare("SELECT * FROM $tblR WHERE id=%d", intval($_GET['from_request'])));
+            if ($req) {
+
+                $prefill_customer = [
+                    'first_name'=>$req->first_name,'last_name'=>$req->last_name,'email'=>$req->email,'phone'=>$req->phone,
+                    'address'=>$req->customer_address,'city'=>$req->customer_city,'zip'=>$req->customer_zip
+                ];
+                $prefill_vehicle['year'] = isset($req->vehicle_year) ? (string) $req->vehicle_year : '';
+                $prefill_vehicle['make'] = isset($req->vehicle_make) ? (string) $req->vehicle_make : '';
+                $prefill_vehicle['model']= isset($req->vehicle_model) ? (string) $req->vehicle_model : '';
+                $prefill_vehicle['engine']= isset($req->vehicle_engine) ? (string) $req->vehicle_engine : '';
+                $prefill_vehicle['transmission'] = isset($req->vehicle_transmission) ? (string) $req->vehicle_transmission : '';
+                $prefill_vehicle['drive'] = isset($req->vehicle_drive) ? (string) $req->vehicle_drive : '';
+                $prefill_vehicle['trim'] = isset($req->vehicle_trim) ? (string) $req->vehicle_trim : '';
             }
         }
 
@@ -336,13 +342,48 @@ class Controller {
               <tr>
                 <th><?php _e('Vehicle Details','arm-repair-estimates'); ?></th>
                 <td>
-                  <label><?php _e('Year','arm-repair-estimates'); ?> <input type="text" id="arm-vehicle-year" name="vehicle_year" class="small-text" value="<?php echo esc_attr($estimate->vehicle_year); ?>"></label>
-                  <label style="margin-left:10px;"><?php _e('Make','arm-repair-estimates'); ?> <input type="text" id="arm-vehicle-make" name="vehicle_make" class="regular-text" style="width:120px;" value="<?php echo esc_attr($estimate->vehicle_make); ?>"></label>
-                  <label style="margin-left:10px;"><?php _e('Model','arm-repair-estimates'); ?> <input type="text" id="arm-vehicle-model" name="vehicle_model" class="regular-text" style="width:140px;" value="<?php echo esc_attr($estimate->vehicle_model); ?>"></label>
-                  <label style="margin-left:10px;"><?php _e('Engine','arm-repair-estimates'); ?> <input type="text" id="arm-vehicle-engine" name="vehicle_engine" class="regular-text" style="width:140px;" value="<?php echo esc_attr($estimate->vehicle_engine); ?>"></label>
-                  <label style="margin-left:10px;"><?php _e('Transmission','arm-repair-estimates'); ?> <input type="text" id="arm-vehicle-transmission" name="vehicle_transmission" class="regular-text" style="width:140px;" value="<?php echo esc_attr($estimate->vehicle_transmission); ?>"></label>
-                  <label style="margin-left:10px;"><?php _e('Drive','arm-repair-estimates'); ?> <input type="text" id="arm-vehicle-drive" name="vehicle_drive" class="regular-text" style="width:110px;" value="<?php echo esc_attr($estimate->vehicle_drive); ?>"></label>
-                  <label style="margin-left:10px;"><?php _e('Trim','arm-repair-estimates'); ?> <input type="text" id="arm-vehicle-trim" name="vehicle_trim" class="regular-text" style="width:140px;" value="<?php echo esc_attr($estimate->vehicle_trim); ?>"></label>
+                  <label>
+                    <?php _e('Year','arm-repair-estimates'); ?>
+                    <select id="arm-vehicle-year" name="vehicle_year" class="small-text" data-selected="<?php echo esc_attr($prefill_vehicle['year']); ?>" data-placeholder="<?php echo esc_attr__('Select Year','arm-repair-estimates'); ?>">
+                      <option value=""><?php esc_html_e('Select Year','arm-repair-estimates'); ?></option>
+                    </select>
+                  </label>
+                  <label style="margin-left:10px;">
+                    <?php _e('Make','arm-repair-estimates'); ?>
+                    <select id="arm-vehicle-make" name="vehicle_make" class="regular-text" style="width:120px;" data-selected="<?php echo esc_attr($prefill_vehicle['make']); ?>" data-placeholder="<?php echo esc_attr__('Select Make','arm-repair-estimates'); ?>">
+                      <option value=""><?php esc_html_e('Select Make','arm-repair-estimates'); ?></option>
+                    </select>
+                  </label>
+                  <label style="margin-left:10px;">
+                    <?php _e('Model','arm-repair-estimates'); ?>
+                    <select id="arm-vehicle-model" name="vehicle_model" class="regular-text" style="width:140px;" data-selected="<?php echo esc_attr($prefill_vehicle['model']); ?>" data-placeholder="<?php echo esc_attr__('Select Model','arm-repair-estimates'); ?>">
+                      <option value=""><?php esc_html_e('Select Model','arm-repair-estimates'); ?></option>
+                    </select>
+                  </label>
+                  <label style="margin-left:10px;">
+                    <?php _e('Engine','arm-repair-estimates'); ?>
+                    <select id="arm-vehicle-engine" name="vehicle_engine" class="regular-text" style="width:140px;" data-selected="<?php echo esc_attr($prefill_vehicle['engine']); ?>" data-placeholder="<?php echo esc_attr__('Select Engine','arm-repair-estimates'); ?>">
+                      <option value=""><?php esc_html_e('Select Engine','arm-repair-estimates'); ?></option>
+                    </select>
+                  </label>
+                  <label style="margin-left:10px;">
+                    <?php _e('Transmission','arm-repair-estimates'); ?>
+                    <select id="arm-vehicle-transmission" name="vehicle_transmission" class="regular-text" style="width:150px;" data-selected="<?php echo esc_attr($prefill_vehicle['transmission']); ?>" data-placeholder="<?php echo esc_attr__('Select Transmission','arm-repair-estimates'); ?>">
+                      <option value=""><?php esc_html_e('Select Transmission','arm-repair-estimates'); ?></option>
+                    </select>
+                  </label>
+                  <label style="margin-left:10px;">
+                    <?php _e('Drive','arm-repair-estimates'); ?>
+                    <select id="arm-vehicle-drive" name="vehicle_drive" class="regular-text" style="width:120px;" data-selected="<?php echo esc_attr($prefill_vehicle['drive']); ?>" data-placeholder="<?php echo esc_attr__('Select Drive','arm-repair-estimates'); ?>">
+                      <option value=""><?php esc_html_e('Select Drive','arm-repair-estimates'); ?></option>
+                    </select>
+                  </label>
+                  <label style="margin-left:10px;">
+                    <?php _e('Trim','arm-repair-estimates'); ?>
+                    <select id="arm-vehicle-trim" name="vehicle_trim" class="regular-text" style="width:150px;" data-selected="<?php echo esc_attr($prefill_vehicle['trim']); ?>" data-placeholder="<?php echo esc_attr__('Select Trim','arm-repair-estimates'); ?>">
+                      <option value=""><?php esc_html_e('Select Trim','arm-repair-estimates'); ?></option>
+                    </select>
+                  </label>
                 </td>
               </tr>
               <tr>

@@ -70,6 +70,192 @@
   }
 
 
+  function initVehicleSelects() {
+    const levels = ['year', 'make', 'model', 'engine', 'transmission', 'drive', 'trim'];
+    const selects = {};
+    levels.forEach(function (level) {
+      selects[level] = $('#arm-vehicle-' + level);
+    });
+    if (!selects.year.length) return;
+
+    const vehicleCfg = ARM_RE_EST.vehicle || {};
+    const ajaxUrl = vehicleCfg.ajax_url || ARM_RE_EST.ajax_url || '';
+    const nonce = vehicleCfg.nonce || '';
+    const initYears = Array.isArray(vehicleCfg.initYears) ? vehicleCfg.initYears : [];
+    const pending = Object.create(null);
+
+    const selectedValues = {};
+    levels.forEach(function (level) {
+      const attr = selects[level].data('selected');
+      selectedValues[level] = (attr !== undefined && attr !== null && String(attr).length) ? String(attr) : '';
+    });
+
+    function placeholderText(level) {
+      const custom = selects[level].data('placeholder');
+      if (custom) return String(custom);
+      return 'Select ' + level.charAt(0).toUpperCase() + level.slice(1);
+    }
+
+    function setOptions(level, options, selected) {
+      const $sel = selects[level];
+      if (!$sel.length) return;
+      const placeholder = placeholderText(level);
+      const opts = Array.isArray(options)
+        ? options.filter(function (value) {
+            return value !== null && value !== undefined && String(value).length;
+          }).map(String)
+        : [];
+      $sel.empty();
+      $sel.append($('<option>').val('').text(placeholder));
+      opts.forEach(function (val) {
+        $sel.append($('<option>').val(val).text(val));
+      });
+      const hasSelection = selected !== undefined && selected !== null && String(selected).length > 0;
+      if (hasSelection) {
+        const strValue = String(selected);
+        let exists = false;
+        $sel.find('option').each(function () {
+          if ($(this).val() === strValue) { exists = true; return false; }
+        });
+        if (!exists) {
+          $sel.append($('<option>').val(strValue).text(strValue));
+        }
+        $sel.prop('disabled', false).val(strValue);
+        selectedValues[level] = strValue;
+      } else {
+        $sel.val('');
+        selectedValues[level] = '';
+        $sel.prop('disabled', opts.length === 0);
+      }
+    }
+
+    function clearDownstream(startIdx) {
+      for (let idx = startIdx + 1; idx < levels.length; idx++) {
+        pending[levels[idx]] = null;
+        setOptions(levels[idx], [], '');
+      }
+    }
+
+    function normalize(values) {
+      const normalized = {};
+      levels.forEach(function (level) {
+        const raw = values && values[level];
+        normalized[level] = (raw !== undefined && raw !== null && String(raw).length) ? String(raw) : '';
+      });
+      return normalized;
+    }
+
+    function fetchOptions(level, filters, preselect) {
+      const deferred = $.Deferred();
+      if (!ajaxUrl || !nonce) {
+        setOptions(level, [], preselect);
+        return deferred.resolve().promise();
+      }
+      const payload = $.extend({
+        action: 'arm_get_vehicle_options',
+        nonce: nonce,
+        next: level
+      }, filters || {});
+      const key = level + '|' + JSON.stringify(payload);
+      pending[level] = key;
+      $.post(ajaxUrl, payload)
+        .done(function (res) {
+          if (pending[level] !== key) return;
+          const options = res && res.success && res.data && Array.isArray(res.data.options) ? res.data.options : [];
+          setOptions(level, options, preselect);
+        })
+        .fail(function () {
+          if (pending[level] !== key) return;
+          setOptions(level, [], preselect);
+        })
+        .always(function () {
+          if (pending[level] === key) pending[level] = null;
+          deferred.resolve();
+        });
+      return deferred.promise();
+    }
+
+    function loadSequence(values) {
+      const target = normalize(values);
+      setOptions(levels[0], initYears.length ? initYears : [], target[levels[0]]);
+      for (let idx = 1; idx < levels.length; idx++) {
+        setOptions(levels[idx], [], target[levels[idx]]);
+      }
+      let chain = $.Deferred().resolve().promise();
+      if (!initYears.length) {
+        chain = chain.then(function () {
+          return fetchOptions(levels[0], {}, target[levels[0]]);
+        });
+      }
+      for (let i = 1; i < levels.length; i++) {
+        chain = chain.then(function () {
+          const level = levels[i];
+          const prevFilled = levels.slice(0, i).every(function (lvl) {
+            return selectedValues[lvl];
+          });
+          if (!prevFilled) {
+            return $.Deferred().resolve().promise();
+          }
+          const filters = {};
+          for (let j = 0; j < i; j++) {
+            filters[levels[j]] = selectedValues[levels[j]];
+          }
+          return fetchOptions(level, filters, target[level]);
+        });
+      }
+      return chain;
+    }
+
+    let readyPromise = $.Deferred().resolve().promise();
+
+    function queueLoad(values) {
+      readyPromise = readyPromise.then(function () {
+        return loadSequence(values);
+      });
+      return readyPromise;
+    }
+
+    queueLoad(selectedValues);
+
+    levels.forEach(function (level, idx) {
+      selects[level].on('change', function () {
+        const val = selects[level].val() || '';
+        selectedValues[level] = val;
+        clearDownstream(idx);
+        if (!val || idx === levels.length - 1) return;
+        const filters = {};
+        for (let j = 0; j <= idx; j++) {
+          const v = selects[levels[j]].val();
+          if (!v) return;
+          filters[levels[j]] = v;
+        }
+        readyPromise = readyPromise.then(function () {
+          return fetchOptions(levels[idx + 1], filters, '');
+        });
+      });
+    });
+
+    window.ARMAdminVehicle = {
+      set: function (values) {
+        return queueLoad(values || {});
+      },
+      getSelected: function () {
+        const snapshot = {};
+        levels.forEach(function (level) {
+          snapshot[level] = selectedValues[level] || '';
+        });
+        return snapshot;
+      },
+      clear: function () {
+        return queueLoad({});
+      },
+      ready: function () {
+        return readyPromise;
+      }
+    };
+  }
+
+
   $doc.on('input change', '.arm-it-qty, .arm-it-price, .arm-it-taxable, .arm-it-type', recalc);
 
 
@@ -190,6 +376,7 @@
 
 
   $(recalc);
+  $(initVehicleSelects);
 
   $doc.on('click', '.arm-copy-pay-link', function (e) {
     e.preventDefault();
@@ -264,13 +451,26 @@
         const data = resp.data;
         vinOutput.text(data.label || '');
         if (data.vehicle) {
-          $('#arm-vehicle-year').val(data.vehicle.year || '');
-          $('#arm-vehicle-make').val(data.vehicle.make || '');
-          $('#arm-vehicle-model').val(data.vehicle.model || '');
-          $('#arm-vehicle-engine').val(data.vehicle.engine || '');
-          $('#arm-vehicle-transmission').val(data.vehicle.transmission || '');
-          $('#arm-vehicle-drive').val(data.vehicle.drive || '');
-          $('#arm-vehicle-trim').val(data.vehicle.trim || '');
+          const vehicleValues = {
+            year: data.vehicle.year || '',
+            make: data.vehicle.make || '',
+            model: data.vehicle.model || '',
+            engine: data.vehicle.engine || '',
+            transmission: data.vehicle.transmission || '',
+            drive: data.vehicle.drive || '',
+            trim: data.vehicle.trim || ''
+          };
+          if (window.ARMAdminVehicle && typeof window.ARMAdminVehicle.set === 'function') {
+            window.ARMAdminVehicle.set(vehicleValues);
+          } else {
+            $('#arm-vehicle-year').val(vehicleValues.year).trigger('change');
+            $('#arm-vehicle-make').val(vehicleValues.make).trigger('change');
+            $('#arm-vehicle-model').val(vehicleValues.model).trigger('change');
+            $('#arm-vehicle-engine').val(vehicleValues.engine).trigger('change');
+            $('#arm-vehicle-transmission').val(vehicleValues.transmission).trigger('change');
+            $('#arm-vehicle-drive').val(vehicleValues.drive).trigger('change');
+            $('#arm-vehicle-trim').val(vehicleValues.trim).trigger('change');
+          }
         }
       }).fail(function () {
         vinButton.prop('disabled', false);
@@ -286,11 +486,14 @@
       $.post(partstechCfg.search, {
         _ajax_nonce: ARM_RE_EST.nonce,
         query: term,
-        vehicle: {
+        vehicle: (window.ARMAdminVehicle && typeof window.ARMAdminVehicle.getSelected === 'function') ? window.ARMAdminVehicle.getSelected() : {
           year: $('#arm-vehicle-year').val(),
           make: $('#arm-vehicle-make').val(),
           model: $('#arm-vehicle-model').val(),
-          engine: $('#arm-vehicle-engine').val()
+          engine: $('#arm-vehicle-engine').val(),
+          transmission: $('#arm-vehicle-transmission').val(),
+          drive: $('#arm-vehicle-drive').val(),
+          trim: $('#arm-vehicle-trim').val()
         }
       }).done(function (resp) {
         searchButton.prop('disabled', false);
