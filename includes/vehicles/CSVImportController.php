@@ -4,7 +4,7 @@ namespace ARM\Vehicles;
 if (!defined('ABSPATH')) exit;
 
 /**
- * CSV Importer for Vehicle dimension (Year, Make, Model, Engine, Drive, Trim).
+ * CSV Importer for Vehicle dimension (Year, Make, Model, Engine, Transmission, Drive, Trim).
  * Menu: Repair Estimates → Vehicle CSV Import
  */
 class CSVImportController {
@@ -32,7 +32,7 @@ class CSVImportController {
         ?>
         <div class="wrap">
           <h1><?php _e('Vehicle CSV Import','arm-repair-estimates'); ?></h1>
-          <p><?php _e('Upload a CSV file with columns: Year, Make, Model, Engine, Drive, Trim. Header row is required.','arm-repair-estimates'); ?></p>
+          <p><?php _e('Upload a CSV file with columns: Year, Make, Model, Engine, Transmission, Drive, Trim. Header row is required.','arm-repair-estimates'); ?></p>
 
           <?php if ($result && !empty($result['message'])): ?>
             <div class="<?php echo $result['ok'] ? 'updated' : 'notice notice-error'; ?>"><p><?php echo esc_html($result['message']); ?></p></div>
@@ -46,9 +46,9 @@ class CSVImportController {
 
           <h2><?php _e('Sample CSV','arm-repair-estimates'); ?></h2>
 <pre>
-Year,Make,Model,Engine,Drive,Trim
-2019,Toyota,Corolla,1.8L,FWD,LE
-2020,Honda,Civic,2.0L,FWD,EX
+Year,Make,Model,Engine,Transmission,Drive,Trim
+2019,Toyota,Corolla,1.8L,Automatic,FWD,LE
+2020,Honda,Civic,2.0L,Manual,FWD,EX
 </pre>
         </div>
         <?php
@@ -77,7 +77,7 @@ Year,Make,Model,Engine,Drive,Trim
             $line++;
             if ($line === 1) {
                 $cols = array_map(function($c){ return strtolower(trim($c)); }, $row);
-                $need = ['year','make','model','engine','drive','trim'];
+                $need = ['year','make','model','engine','transmission','drive','trim'];
                 foreach ($need as $n) {
                     if (!in_array($n, $cols, true)) {
                         fclose($fh);
@@ -91,8 +91,8 @@ Year,Make,Model,Engine,Drive,Trim
             if (!$data) { $fail++; continue; }
 
             $sql = $wpdb->prepare(
-                "INSERT IGNORE INTO $tbl (year, make, model, engine, drive, trim, created_at) VALUES (%d,%s,%s,%s,%s,%s,%s)",
-                (int)$data['year'], $data['make'], $data['model'], $data['engine'], $data['drive'], $data['trim'], current_time('mysql')
+                "INSERT IGNORE INTO $tbl (year, make, model, engine, transmission, drive, trim, created_at) VALUES (%d,%s,%s,%s,%s,%s,%s,%s)",
+                (int)$data['year'], $data['make'], $data['model'], $data['engine'], $data['transmission'], $data['drive'], $data['trim'], current_time('mysql')
             );
             $res = $wpdb->query($sql);
             if ($res === false) { $fail++; }
@@ -116,9 +116,10 @@ Year,Make,Model,Engine,Drive,Trim
         $make = trim((string)($map['make'] ?? ''));
         $model= trim((string)($map['model'] ?? ''));
         $engine=trim((string)($map['engine'] ?? ''));
+        $transmission = trim((string)($map['transmission'] ?? ''));
         $drive =trim((string)($map['drive'] ?? ''));
         $trim  =trim((string)($map['trim'] ?? ''));
-        if ($year < 1900 || !$make || !$model || !$engine || !$drive || !$trim) return null;
-        return compact('year','make','model','engine','drive','trim');
+        if ($year < 1900 || !$make || !$model || !$engine || !$transmission || !$drive || !$trim) return null;
+        return compact('year','make','model','engine','transmission','drive','trim');
     }
 }

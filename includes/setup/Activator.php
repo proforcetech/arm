@@ -173,14 +173,18 @@ final class Activator
             make VARCHAR(80) NOT NULL,
             model VARCHAR(120) NOT NULL,
             engine VARCHAR(120) NOT NULL,
+            transmission VARCHAR(80) NOT NULL,
             drive VARCHAR(80) NOT NULL,
             trim  VARCHAR(120) NOT NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
-            UNIQUE KEY uniq_vehicle (year, make, model, engine, drive, trim),
+            UNIQUE KEY uniq_vehicle (year, make, model, engine, transmission, drive, trim),
             KEY idx_year (year),
             KEY idx_make (make),
-            KEY idx_model (model)
+            KEY idx_model (model),
+            KEY idx_engine (engine),
+            KEY idx_transmission (transmission),
+            KEY idx_drive (drive)
         ) $charset;";
 
         

@@ -5,7 +5,7 @@ if (!defined('ABSPATH')) exit;
 
 /**
  * Public AJAX handlers:
- *  - arm_get_vehicle_options  (cascading Year/Make/Model/Engine/Drive/Trim)
+ *  - arm_get_vehicle_options  (cascading Year/Make/Model/Engine/Transmission/Drive/Trim)
  *  - arm_submit_estimate      (stores public request, emails admin)
  */
 final class Ajax_Submit {
@@ -25,14 +25,14 @@ final class Ajax_Submit {
 
     /**
      * AJAX: return next-level vehicle options based on current filters.
-     * POST: nonce, next, (year, make, model, engine, drive)
+     * POST: nonce, next, (year, make, model, engine, transmission, drive)
      */
     public static function ajax_get_vehicle_options(): void {
         \check_ajax_referer('arm_re_nonce', 'nonce');
 
         global $wpdb;
         $tbl   = $wpdb->prefix . 'arm_vehicle_data';
-        $hier  = ['year','make','model','engine','drive','trim'];
+        $hier  = ['year','make','model','engine','transmission','drive','trim'];
         $next  = \sanitize_text_field($_POST['next'] ?? '');
 
         if (!in_array($next, $hier, true)) {
@@ -91,7 +91,10 @@ final class Ajax_Submit {
         
         $other = !empty($_POST['vehicle_other']);
         if (!$other) {
-            foreach (['vehicle_year','vehicle_make','vehicle_model','vehicle_engine','vehicle_drive','vehicle_trim'] as $r) {
+            foreach ([
+                'vehicle_year','vehicle_make','vehicle_model','vehicle_engine',
+                'vehicle_transmission','vehicle_drive','vehicle_trim'
+            ] as $r) {
                 if (empty($_POST[$r])) {
                     \wp_send_json_error(['message' => 'Missing vehicle selection']);
                 }
@@ -120,6 +123,7 @@ final class Ajax_Submit {
             'vehicle_make'   => $other ? null : \sanitize_text_field($_POST['vehicle_make'] ?? ''),
             'vehicle_model'  => $other ? null : \sanitize_text_field($_POST['vehicle_model'] ?? ''),
             'vehicle_engine' => $other ? null : \sanitize_text_field($_POST['vehicle_engine'] ?? ''),
+            'vehicle_transmission' => $other ? null : \sanitize_text_field($_POST['vehicle_transmission'] ?? ''),
             'vehicle_drive'  => $other ? null : \sanitize_text_field($_POST['vehicle_drive'] ?? ''),
             'vehicle_trim'   => $other ? null : \sanitize_text_field($_POST['vehicle_trim'] ?? ''),
             'vehicle_other'  => $other ? \sanitize_textarea_field($_POST['vehicle_other']) : null,
@@ -160,7 +164,7 @@ final class Ajax_Submit {
         if ($admin_email) {
             $veh = $other
                 ? ($data['vehicle_other'] ?? '')
-                : trim("{$data['vehicle_year']} {$data['vehicle_make']} {$data['vehicle_model']} {$data['vehicle_engine']} {$data['vehicle_drive']} {$data['vehicle_trim']}");
+                : trim("{$data['vehicle_year']} {$data['vehicle_make']} {$data['vehicle_model']} {$data['vehicle_engine']} {$data['vehicle_transmission']} {$data['vehicle_drive']} {$data['vehicle_trim']}");
             $delivery = $del_both ? 'Both' : trim(($del_email ? 'Email ' : '') . ($del_sms ? 'SMS' : ''));
 
             $subj = sprintf('[Estimate Request] %s %s', $data['first_name'], $data['last_name']);

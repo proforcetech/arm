@@ -25,7 +25,7 @@
 
   if (!document.getElementById('arm-repair-estimate-form')) return;
 
-  const HIER = ['year', 'make', 'model', 'engine', 'drive', 'trim'];
+  const HIER = ['year', 'make', 'model', 'engine', 'transmission', 'drive', 'trim'];
   const IDS = HIER.map(h => '#arm_' + h);
 
   const pendingKeyByLevel = Object.create(null);

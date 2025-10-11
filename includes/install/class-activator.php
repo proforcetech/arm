@@ -24,11 +24,11 @@ final class Activator {
         
         self::require_modules();
 
-        $charset         = $wpdb->get_charset_collate();
-        $vehicle_table   = $wpdb->prefix . 'arm_vehicle_data';
-        $vehicles_table  = $wpdb->prefix . 'arm_vehicles';
-        $service_table   = $wpdb->prefix . 'arm_service_types';
-        $requests_table  = $wpdb->prefix . 'arm_estimate_requests';
+        $charset        = $wpdb->get_charset_collate();
+        $vehicles_table = $wpdb->prefix . 'arm_vehicles';
+        $service_table  = $wpdb->prefix . 'arm_service_types';
+
+        self::install_vehicle_schema();
 
         dbDelta ("CREATE TABLE {$wpdb->prefix}arm_customers (
           id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -44,28 +44,6 @@ final class Activator {
           tax_exempt TINYINT(1) NOT NULL DEFAULT 0,
           created_at DATETIME NOT NULL,
           updated_at DATETIME NULL
-        ) $charset;");
-
-
-        
-        dbDelta("CREATE TABLE $vehicle_table (
-            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            year SMALLINT NOT NULL,
-            make VARCHAR(64) NOT NULL,
-            model VARCHAR(64) NOT NULL,
-            engine VARCHAR(128) NOT NULL,
-            drive VARCHAR(32) NOT NULL,
-            trim VARCHAR(128) NOT NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME NULL,
-            PRIMARY KEY  (id),
-            UNIQUE KEY combo (year, make, model, engine, drive, trim),
-            KEY yr (year),
-            KEY mk (make),
-            KEY mdl (model),
-            KEY eng (engine),
-            KEY drv (drive),
-            KEY trm (trim)
         ) $charset;");
 
         dbDelta("CREATE TABLE $vehicles_table (
@@ -99,39 +77,6 @@ final class Activator {
             UNIQUE KEY name (name),
             KEY active (is_active),
             KEY sort (sort_order)
-        ) $charset;");
-
-        
-        dbDelta("CREATE TABLE $requests_table (
-            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            vehicle_year SMALLINT NULL,
-            vehicle_make VARCHAR(64) NULL,
-            vehicle_model VARCHAR(64) NULL,
-            vehicle_engine VARCHAR(128) NULL,
-            vehicle_drive VARCHAR(32) NULL,
-            vehicle_trim VARCHAR(128) NULL,
-            vehicle_other TEXT NULL,
-            service_type_id BIGINT UNSIGNED NULL,
-            issue_description TEXT NULL,
-            first_name VARCHAR(64) NOT NULL,
-            last_name VARCHAR(64) NOT NULL,
-            email VARCHAR(128) NOT NULL,
-            phone VARCHAR(32) NULL,
-            customer_address VARCHAR(200) NOT NULL,
-            customer_city VARCHAR(100) NOT NULL,
-            customer_zip VARCHAR(20) NOT NULL,
-            service_same_as_customer TINYINT(1) NOT NULL DEFAULT 0,
-            service_address VARCHAR(200) NOT NULL,
-            service_city VARCHAR(100) NOT NULL,
-            service_zip VARCHAR(20) NOT NULL,
-            delivery_email TINYINT(1) NOT NULL DEFAULT 0,
-            delivery_sms TINYINT(1) NOT NULL DEFAULT 0,
-            delivery_both TINYINT(1) NOT NULL DEFAULT 0,
-            terms_accepted TINYINT(1) NOT NULL DEFAULT 0,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            KEY stype (service_type_id),
-            KEY created_at (created_at)
         ) $charset;");
 
         
@@ -196,6 +141,72 @@ final class Activator {
 
     }
 
+    private static function install_vehicle_schema(): void
+    {
+        global $wpdb;
+
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+
+        $charset        = $wpdb->get_charset_collate();
+        $vehicle_table  = $wpdb->prefix . 'arm_vehicle_data';
+        $requests_table = $wpdb->prefix . 'arm_estimate_requests';
+
+        dbDelta("CREATE TABLE $vehicle_table (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            year SMALLINT NOT NULL,
+            make VARCHAR(64) NOT NULL,
+            model VARCHAR(64) NOT NULL,
+            engine VARCHAR(128) NOT NULL,
+            transmission VARCHAR(80) NOT NULL,
+            drive VARCHAR(32) NOT NULL,
+            trim VARCHAR(128) NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY combo (year, make, model, engine, transmission, drive, trim),
+            KEY yr (year),
+            KEY mk (make),
+            KEY mdl (model),
+            KEY eng (engine),
+            KEY trn (transmission),
+            KEY drv (drive),
+            KEY trm (trim)
+        ) $charset;");
+
+        dbDelta("CREATE TABLE $requests_table (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            vehicle_year SMALLINT NULL,
+            vehicle_make VARCHAR(64) NULL,
+            vehicle_model VARCHAR(64) NULL,
+            vehicle_engine VARCHAR(128) NULL,
+            vehicle_transmission VARCHAR(80) NULL,
+            vehicle_drive VARCHAR(32) NULL,
+            vehicle_trim VARCHAR(128) NULL,
+            vehicle_other TEXT NULL,
+            service_type_id BIGINT UNSIGNED NULL,
+            issue_description TEXT NULL,
+            first_name VARCHAR(64) NOT NULL,
+            last_name VARCHAR(64) NOT NULL,
+            email VARCHAR(128) NOT NULL,
+            phone VARCHAR(32) NULL,
+            customer_address VARCHAR(200) NOT NULL,
+            customer_city VARCHAR(100) NOT NULL,
+            customer_zip VARCHAR(20) NOT NULL,
+            service_same_as_customer TINYINT(1) NOT NULL DEFAULT 0,
+            service_address VARCHAR(200) NOT NULL,
+            service_city VARCHAR(100) NOT NULL,
+            service_zip VARCHAR(20) NOT NULL,
+            delivery_email TINYINT(1) NOT NULL DEFAULT 0,
+            delivery_sms TINYINT(1) NOT NULL DEFAULT 0,
+            delivery_both TINYINT(1) NOT NULL DEFAULT 0,
+            terms_accepted TINYINT(1) NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY stype (service_type_id),
+            KEY created_at (created_at)
+        ) $charset;");
+    }
+
     public static function maybe_upgrade(): void
     {
         if (!function_exists('get_option')) {
@@ -208,6 +219,7 @@ final class Activator {
         }
 
         self::require_modules();
+        self::install_vehicle_schema();
 
         if (class_exists('\\ARM\\Appointments\\Installer')) {
             \ARM\Appointments\Installer::maybe_upgrade_legacy_schema();

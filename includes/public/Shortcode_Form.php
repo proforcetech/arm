@@ -18,7 +18,7 @@ class Shortcode_Form {
 
           <h3><?php _e('Vehicle Selection','arm-repair-estimates'); ?></h3>
           <div class="arm-grid">
-            <?php foreach (['year','make','model','engine','drive','trim'] as $f): ?>
+            <?php foreach (['year','make','model','engine','transmission','drive','trim'] as $f): ?>
             <div>
               <label for="arm_<?php echo esc_attr($f); ?>"><?php echo esc_html(ucfirst($f)); ?> *</label>
               <select id="arm_<?php echo esc_attr($f); ?>" name="vehicle_<?php echo esc_attr($f); ?>" <?php echo $f==='year'?'':'disabled'; ?> required>
@@ -30,7 +30,7 @@ class Shortcode_Form {
 
           <div class="arm-row arm-other">
             <label><input type="checkbox" id="arm_other_toggle"> <?php _e('Other','arm-repair-estimates'); ?></label>
-            <input type="text" id="arm_other_text" name="vehicle_other" placeholder="<?php esc_attr_e('Enter vehicle info (Year/Make/Model/Engine/Drive/Trim)','arm-repair-estimates'); ?>" style="display:none;">
+            <input type="text" id="arm_other_text" name="vehicle_other" placeholder="<?php esc_attr_e('Enter vehicle info (Year/Make/Model/Engine/Transmission/Drive/Trim)','arm-repair-estimates'); ?>" style="display:none;">
           </div>
 
           <div class="arm-row">
@@ -100,7 +100,7 @@ class Shortcode_Form {
         check_ajax_referer('arm_re_nonce','nonce');
         global $wpdb;
         $tbl = $wpdb->prefix.'arm_vehicle_data';
-        $hier = ['year','make','model','engine','drive','trim'];
+        $hier = ['year','make','model','engine','transmission','drive','trim'];
         $next = sanitize_text_field($_POST['next'] ?? '');
         if (!in_array($next, $hier, true)) wp_send_json_error(['message'=>'Invalid level']);
 
