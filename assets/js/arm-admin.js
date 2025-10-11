@@ -81,7 +81,25 @@
     const vehicleCfg = ARM_RE_EST.vehicle || {};
     const ajaxUrl = vehicleCfg.ajax_url || ARM_RE_EST.ajax_url || '';
     const nonce = vehicleCfg.nonce || '';
-    const initYears = Array.isArray(vehicleCfg.initYears) ? vehicleCfg.initYears : [];
+
+    let initYears = [];
+    if (Array.isArray(vehicleCfg.initYears)) {
+      initYears = vehicleCfg.initYears.slice();
+    } else if (typeof vehicleCfg.years === 'string' && vehicleCfg.years.length) {
+      try {
+        const parsedYears = JSON.parse(vehicleCfg.years);
+        if (Array.isArray(parsedYears)) initYears = parsedYears;
+      } catch (err) {
+        initYears = [];
+      }
+    }
+
+    if (!Array.isArray(initYears)) initYears = [];
+    initYears = initYears.filter(function (value) {
+      return value !== null && value !== undefined && String(value).length;
+    }).map(function (value) {
+      return String(value);
+    });
     const pending = Object.create(null);
 
     const selectedValues = {};
