@@ -47,6 +47,13 @@ class Controller {
             request_id BIGINT UNSIGNED NULL,
             customer_id BIGINT UNSIGNED NOT NULL,
             estimate_no VARCHAR(32) NOT NULL,
+            vehicle_year SMALLINT UNSIGNED NULL,
+            vehicle_make VARCHAR(80) NULL,
+            vehicle_model VARCHAR(120) NULL,
+            vehicle_engine VARCHAR(120) NULL,
+            vehicle_transmission VARCHAR(80) NULL,
+            vehicle_drive VARCHAR(80) NULL,
+            vehicle_trim VARCHAR(120) NULL,
             status ENUM('DRAFT','SENT','APPROVED','DECLINED','EXPIRED','NEEDS_REAPPROVAL') NOT NULL DEFAULT 'DRAFT',
             version INT NOT NULL DEFAULT 1,
             approved_at DATETIME NULL,
@@ -223,7 +230,14 @@ class Controller {
             'callout_fee'=> (float)get_option('arm_re_callout_default',0),
             'mileage_miles'=> 0,
             'mileage_rate'=> (float)get_option('arm_re_mileage_rate_default',0),
-            'mileage_total'=>0
+            'mileage_total'=>0,
+            'vehicle_year' => '',
+            'vehicle_make' => '',
+            'vehicle_model'=> '',
+            'vehicle_engine'=> '',
+            'vehicle_transmission' => '',
+            'vehicle_drive' => '',
+            'vehicle_trim'  => '',
         ];
         $estimate = (object)$defaults;
         $jobs = [];
@@ -268,9 +282,19 @@ class Controller {
             }
         }
 
-        
+
         $customer = null;
         if ($estimate->customer_id) $customer = $wpdb->get_row($wpdb->prepare("SELECT * FROM $tblC WHERE id=%d", $estimate->customer_id));
+
+        $vehicle_fields = ['vehicle_year','vehicle_make','vehicle_model','vehicle_engine','vehicle_transmission','vehicle_drive','vehicle_trim'];
+        foreach ($vehicle_fields as $vf) {
+            if (!property_exists($estimate, $vf) || $estimate->$vf === null) {
+                $estimate->$vf = '';
+            }
+            if ($prefill_vehicle && array_key_exists($vf, $prefill_vehicle) && $estimate->$vf === '') {
+                $estimate->$vf = (string)($prefill_vehicle[$vf] ?? '');
+            }
+        }
 
         $action_url = admin_url('admin-post.php');
         $save_nonce = wp_create_nonce('arm_re_save_estimate');
@@ -827,6 +851,21 @@ public static function item_row_template() {
         }
 
         
+        $vehicle_year = isset($_POST['vehicle_year']) ? (int)$_POST['vehicle_year'] : 0;
+        $vehicle_year = ($vehicle_year >= 1886) ? $vehicle_year : null;
+        $vehicle_make = trim(sanitize_text_field($_POST['vehicle_make'] ?? ''));
+        $vehicle_make = ($vehicle_make !== '') ? $vehicle_make : null;
+        $vehicle_model = trim(sanitize_text_field($_POST['vehicle_model'] ?? ''));
+        $vehicle_model = ($vehicle_model !== '') ? $vehicle_model : null;
+        $vehicle_engine = trim(sanitize_text_field($_POST['vehicle_engine'] ?? ''));
+        $vehicle_engine = ($vehicle_engine !== '') ? $vehicle_engine : null;
+        $vehicle_transmission = trim(sanitize_text_field($_POST['vehicle_transmission'] ?? ''));
+        $vehicle_transmission = ($vehicle_transmission !== '') ? $vehicle_transmission : null;
+        $vehicle_drive = trim(sanitize_text_field($_POST['vehicle_drive'] ?? ''));
+        $vehicle_drive = ($vehicle_drive !== '') ? $vehicle_drive : null;
+        $vehicle_trim = trim(sanitize_text_field($_POST['vehicle_trim'] ?? ''));
+        $vehicle_trim = ($vehicle_trim !== '') ? $vehicle_trim : null;
+
         $jobs_post = $_POST['jobs'] ?? null;
         $prepared_items = [];  
         $jobs_to_insert = [];  
@@ -887,6 +926,13 @@ public static function item_row_template() {
 
         $data = [
             'estimate_no'=>$estimate_no,'status'=>$status,'customer_id'=>$customer_id,
+            'vehicle_year'=>$vehicle_year,
+            'vehicle_make'=>$vehicle_make,
+            'vehicle_model'=>$vehicle_model,
+            'vehicle_engine'=>$vehicle_engine,
+            'vehicle_transmission'=>$vehicle_transmission,
+            'vehicle_drive'=>$vehicle_drive,
+            'vehicle_trim'=>$vehicle_trim,
             'tax_rate'=>$tax_rate,'subtotal'=>round($subtotal,2),'tax_amount'=>$tax_amount,'total'=>$total,
             'callout_fee'=>round($callout_fee,2),
             'mileage_miles'=>round($mileage_miles,2),

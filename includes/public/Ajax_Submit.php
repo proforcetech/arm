@@ -20,8 +20,15 @@ class Ajax_Submit {
 
         $other = !empty($_POST['vehicle_other']);
         if (!$other) {
-            foreach (['vehicle_year','vehicle_make','vehicle_model','vehicle_engine','vehicle_drive','vehicle_trim'] as $r)
+            $required_vehicle = ['vehicle_year','vehicle_make','vehicle_model','vehicle_engine'];
+            if (array_key_exists('vehicle_transmission', $_POST)) {
+                $required_vehicle[] = 'vehicle_transmission';
+            }
+            $required_vehicle[] = 'vehicle_drive';
+            $required_vehicle[] = 'vehicle_trim';
+            foreach ($required_vehicle as $r) {
                 if (empty($_POST[$r])) wp_send_json_error(['message'=>'Missing vehicle selection']);
+            }
         }
 
         $del_email = !empty($_POST['delivery_email']) ? 1 : 0;
@@ -36,6 +43,7 @@ class Ajax_Submit {
             'vehicle_make'  => $other ? null : sanitize_text_field($_POST['vehicle_make'] ?? ''),
             'vehicle_model' => $other ? null : sanitize_text_field($_POST['vehicle_model'] ?? ''),
             'vehicle_engine'=> $other ? null : sanitize_text_field($_POST['vehicle_engine'] ?? ''),
+            'vehicle_transmission' => $other ? null : sanitize_text_field($_POST['vehicle_transmission'] ?? ''),
             'vehicle_drive' => $other ? null : sanitize_text_field($_POST['vehicle_drive'] ?? ''),
             'vehicle_trim'  => $other ? null : sanitize_text_field($_POST['vehicle_trim'] ?? ''),
             'vehicle_other' => $other ? sanitize_textarea_field($_POST['vehicle_other']) : null,
@@ -62,7 +70,7 @@ class Ajax_Submit {
         $admin_email = sanitize_email(get_option('arm_re_notify_email', get_option('admin_email')));
         if ($admin_email) {
             $subj = sprintf('[Estimate Request] %s %s', $data['first_name'], $data['last_name']);
-            $veh  = $other ? $data['vehicle_other'] : trim("{$data['vehicle_year']} {$data['vehicle_make']} {$data['vehicle_model']} {$data['vehicle_engine']} {$data['vehicle_drive']} {$data['vehicle_trim']}");
+            $veh  = $other ? $data['vehicle_other'] : trim("{$data['vehicle_year']} {$data['vehicle_make']} {$data['vehicle_model']} {$data['vehicle_engine']} {$data['vehicle_transmission']} {$data['vehicle_drive']} {$data['vehicle_trim']}");
             $body = "New estimate request:\n\n"
                   . "Name: {$data['first_name']} {$data['last_name']}\nEmail: {$data['email']}\nPhone: {$data['phone']}\n\n"
                   . "Vehicle: {$veh}\nService Type ID: {$data['service_type_id']}\n\n"
