@@ -19,6 +19,7 @@ class Vehicles {
                 'make'=>sanitize_text_field($_POST['make']),
                 'model'=>sanitize_text_field($_POST['model']),
                 'engine'=>sanitize_text_field($_POST['engine']),
+                'transmission'=>sanitize_text_field($_POST['transmission']),
                 'drive'=>sanitize_text_field($_POST['drive']),
                 'trim'=>sanitize_text_field($_POST['trim']),
                 'updated_at'=>current_time('mysql'),
@@ -46,6 +47,7 @@ class Vehicles {
                         'make'=>sanitize_text_field($map['make'] ?? ''),
                         'model'=>sanitize_text_field($map['model'] ?? ''),
                         'engine'=>sanitize_text_field($map['engine'] ?? ''),
+                        'transmission'=>sanitize_text_field($map['transmission'] ?? ''),
                         'drive'=>sanitize_text_field($map['drive'] ?? ''),
                         'trim'=>sanitize_text_field($map['trim'] ?? ''),
                         'created_at'=>current_time('mysql'),
@@ -62,7 +64,7 @@ class Vehicles {
 
         $edit = null; if (!empty($_GET['edit'])) $edit = $wpdb->get_row($wpdb->prepare("SELECT * FROM $tbl WHERE id=%d",(int)$_GET['edit']));
 
-        $rows = $wpdb->get_results("SELECT * FROM $tbl ORDER BY year DESC, make ASC, model ASC, engine ASC, drive ASC, trim ASC LIMIT 200");
+        $rows = $wpdb->get_results("SELECT * FROM $tbl ORDER BY year DESC, make ASC, model ASC, engine ASC, transmission ASC, drive ASC, trim ASC LIMIT 200");
         ?>
         <div class="wrap">
           <h1><?php _e('Vehicle Data','arm-repair-estimates'); ?></h1>
@@ -76,6 +78,7 @@ class Vehicles {
               <tr><th>Make</th><td><input type="text" name="make" required value="<?php echo esc_attr($edit->make ?? ''); ?>"></td></tr>
               <tr><th>Model</th><td><input type="text" name="model" required value="<?php echo esc_attr($edit->model ?? ''); ?>"></td></tr>
               <tr><th>Engine</th><td><input type="text" name="engine" required value="<?php echo esc_attr($edit->engine ?? ''); ?>"></td></tr>
+              <tr><th>Transmission</th><td><input type="text" name="transmission" required value="<?php echo esc_attr($edit->transmission ?? ''); ?>"></td></tr>
               <tr><th>Drive</th><td><input type="text" name="drive" required value="<?php echo esc_attr($edit->drive ?? ''); ?>"></td></tr>
               <tr><th>Trim</th><td><input type="text" name="trim" required value="<?php echo esc_attr($edit->trim ?? ''); ?>"></td></tr>
             </table>
@@ -86,12 +89,12 @@ class Vehicles {
           <form method="post" enctype="multipart/form-data">
             <?php wp_nonce_field('arm_vehicle_csv_upload','arm_vehicle_csv_nonce'); ?>
             <p><input type="file" name="vehicle_csv" accept=".csv"> <button class="button"><?php _e('Upload CSV','arm-repair-estimates'); ?></button></p>
-            <p class="description"><?php _e('Header: year,make,model,engine,drive,trim','arm-repair-estimates'); ?></p>
+            <p class="description"><?php _e('Header: year,make,model,engine,transmission,drive,trim','arm-repair-estimates'); ?></p>
           </form>
 
           <h2><?php _e('Entries','arm-repair-estimates'); ?></h2>
           <table class="widefat striped">
-            <thead><tr><th>ID</th><th>Year</th><th>Make</th><th>Model</th><th>Engine</th><th>Drive</th><th>Trim</th><th><?php _e('Actions'); ?></th></tr></thead>
+            <thead><tr><th>ID</th><th>Year</th><th>Make</th><th>Model</th><th>Engine</th><th>Transmission</th><th>Drive</th><th>Trim</th><th><?php _e('Actions'); ?></th></tr></thead>
             <tbody>
             <?php if ($rows): foreach ($rows as $r):
                 $del = wp_nonce_url(add_query_arg(['del'=>$r->id]),'arm_vehicle_del');
@@ -103,6 +106,7 @@ class Vehicles {
                 <td><?php echo esc_html($r->make); ?></td>
                 <td><?php echo esc_html($r->model); ?></td>
                 <td><?php echo esc_html($r->engine); ?></td>
+                <td><?php echo esc_html($r->transmission); ?></td>
                 <td><?php echo esc_html($r->drive); ?></td>
                 <td><?php echo esc_html($r->trim); ?></td>
                 <td><a href="<?php echo esc_url($edit_url); ?>"><?php _e('Edit'); ?></a> | <a href="<?php echo esc_url($del); ?>" onclick="return confirm('<?php echo esc_js(__('Delete?')); ?>');"><?php _e('Delete'); ?></a></td>
