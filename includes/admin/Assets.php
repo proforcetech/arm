@@ -42,6 +42,7 @@ class Assets {
                 'ajax_url'  => $ajax_url,
                 'nonce'     => wp_create_nonce('arm_re_nonce'),
                 'initYears' => array_map('strval', $vehicle_years),
+                'selectorNewValue' => \ARM\Estimates\Controller::vehicle_selector_new_value(),
             ],
             'itemRowTemplate' => \ARM\Estimates\Controller::item_row_template(),
             'i18n' => [
@@ -51,6 +52,8 @@ class Assets {
                 'vinPlaceholder'=> __('Enter a 17-digit VIN', 'arm-repair-estimates'),
                 'vinError'      => __('VIN lookup failed. Check the VIN and try again.', 'arm-repair-estimates'),
                 'searchError'   => __('Parts search failed. Please try again.', 'arm-repair-estimates'),
+                'selectSavedVehicle' => __('Select a saved vehicle', 'arm-repair-estimates'),
+                'addNewVehicle'     => __('Add new vehicle', 'arm-repair-estimates'),
             ],
         ]);
     }

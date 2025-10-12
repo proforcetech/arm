@@ -5,6 +5,8 @@ if (!defined('ABSPATH')) exit;
 
 class Controller {
 
+    private const VEHICLE_SELECTOR_NEW_VALUE = '__new__';
+
     /** ----------------------------------------------------------------
      * Boot: hooks (admin + public actions used by the estimates module)
      * -----------------------------------------------------------------*/
@@ -14,6 +16,7 @@ class Controller {
         add_action('admin_post_arm_re_mark_status',     [__CLASS__, 'handle_mark_status']);
 
         add_action('wp_ajax_arm_re_search_customers',   [__CLASS__, 'ajax_search_customers']);
+        add_action('wp_ajax_arm_re_customer_vehicles',  [__CLASS__, 'ajax_customer_vehicles']);
     }
 
     /** ----------------------------------------------------------------
@@ -249,6 +252,7 @@ class Controller {
         ];
         $selected_vehicle_id = 0;
         $selected_vehicle_row = null;
+        $customer_vehicle_rows = [];
 
         if ($id) {
             $estimate = $wpdb->get_row($wpdb->prepare("SELECT * FROM $tblE WHERE id=%d", $id));
@@ -325,11 +329,35 @@ class Controller {
 
         
         $customer = null;
-        if ($estimate->customer_id) $customer = $wpdb->get_row($wpdb->prepare("SELECT * FROM $tblC WHERE id=%d", $estimate->customer_id));
+        $customer_id_for_vehicles = 0;
+        if ($estimate->customer_id) {
+            $customer = $wpdb->get_row($wpdb->prepare("SELECT * FROM $tblC WHERE id=%d", $estimate->customer_id));
+            $customer_id_for_vehicles = (int) $estimate->customer_id;
+        } elseif (!empty($_GET['customer_id'])) {
+            $customer_id_for_vehicles = (int) $_GET['customer_id'];
+        }
+
+        if ($customer_id_for_vehicles > 0) {
+            $vehicle_columns = self::get_vehicle_table_columns();
+            $conditions = 'customer_id = %d';
+            if (in_array('deleted_at', $vehicle_columns, true)) {
+                $conditions .= " AND (deleted_at IS NULL OR deleted_at='0000-00-00 00:00:00')";
+            }
+            $order_by = 'id DESC';
+            if (in_array('updated_at', $vehicle_columns, true)) {
+                $order_by = 'updated_at DESC, id DESC';
+            }
+            $sql = "SELECT * FROM $tblV WHERE $conditions ORDER BY $order_by";
+            $customer_vehicle_rows = $wpdb->get_results($wpdb->prepare($sql, $customer_id_for_vehicles));
+        }
 
         $action_url = admin_url('admin-post.php');
         $save_nonce = wp_create_nonce('arm_re_save_estimate');
         $send_url   = $id ? wp_nonce_url(admin_url('admin-post.php?action=arm_re_send_estimate&id='.(int)$id), 'arm_re_send_estimate') : '';
+
+        $vehicle_selector_mode = $selected_vehicle_id > 0 ? 'existing' : 'add_new';
+        $vehicle_selector_value = $selected_vehicle_id > 0 ? (string) $selected_vehicle_id : self::VEHICLE_SELECTOR_NEW_VALUE;
+        $vehicle_selector_options = self::build_vehicle_selector_options($customer_vehicle_rows, $selected_vehicle_id);
         ?>
         <div class="wrap">
           <h1><?php echo $id ? __('Edit Estimate','arm-repair-estimates') : __('New Estimate','arm-repair-estimates'); ?></h1>
@@ -374,49 +402,59 @@ class Controller {
                 <th><?php _e('Vehicle Details','arm-repair-estimates'); ?></th>
                 <td data-selected-vehicle="<?php echo (int) $selected_vehicle_id; ?>">
                   <input type="hidden" name="vehicle_id" id="arm-vehicle-id" value="<?php echo (int) $selected_vehicle_id; ?>">
-                  <input type="hidden" name="vehicle_selector_action" id="arm-vehicle-selector-action" value="">
-                  <label>
-                    <?php _e('Year','arm-repair-estimates'); ?>
-                    <select id="arm-vehicle-year" name="vehicle_year" class="small-text" data-selected="<?php echo esc_attr($prefill_vehicle['year']); ?>" data-placeholder="<?php echo esc_attr__('Select Year','arm-repair-estimates'); ?>">
-                      <option value=""><?php esc_html_e('Select Year','arm-repair-estimates'); ?></option>
+                  <input type="hidden" name="vehicle_selector_action" id="arm-vehicle-selector-action" value="<?php echo esc_attr($vehicle_selector_mode); ?>">
+                  <input type="hidden" name="vehicle_selector_mode" id="arm-vehicle-selector-mode" value="<?php echo esc_attr($vehicle_selector_mode); ?>">
+                  <input type="hidden" name="vehicle_selector_vehicle_id" id="arm-vehicle-selector-vehicle-id" value="<?php echo esc_attr($vehicle_selector_value); ?>">
+                  <label style="display:block;margin-bottom:10px;">
+                    <?php _e('Saved Vehicles','arm-repair-estimates'); ?>
+                    <select id="arm-vehicle-selector" class="regular-text" style="min-width:220px;">
+                      <?php echo $vehicle_selector_options; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
                     </select>
                   </label>
-                  <label style="margin-left:10px;">
-                    <?php _e('Make','arm-repair-estimates'); ?>
-                    <select id="arm-vehicle-make" name="vehicle_make" class="regular-text" style="width:120px;" data-selected="<?php echo esc_attr($prefill_vehicle['make']); ?>" data-placeholder="<?php echo esc_attr__('Select Make','arm-repair-estimates'); ?>">
-                      <option value=""><?php esc_html_e('Select Make','arm-repair-estimates'); ?></option>
-                    </select>
-                  </label>
-                  <label style="margin-left:10px;">
-                    <?php _e('Model','arm-repair-estimates'); ?>
-                    <select id="arm-vehicle-model" name="vehicle_model" class="regular-text" style="width:140px;" data-selected="<?php echo esc_attr($prefill_vehicle['model']); ?>" data-placeholder="<?php echo esc_attr__('Select Model','arm-repair-estimates'); ?>">
-                      <option value=""><?php esc_html_e('Select Model','arm-repair-estimates'); ?></option>
-                    </select>
-                  </label>
-                  <label style="margin-left:10px;">
-                    <?php _e('Engine','arm-repair-estimates'); ?>
-                    <select id="arm-vehicle-engine" name="vehicle_engine" class="regular-text" style="width:140px;" data-selected="<?php echo esc_attr($prefill_vehicle['engine']); ?>" data-placeholder="<?php echo esc_attr__('Select Engine','arm-repair-estimates'); ?>">
-                      <option value=""><?php esc_html_e('Select Engine','arm-repair-estimates'); ?></option>
-                    </select>
-                  </label>
-                  <label style="margin-left:10px;">
-                    <?php _e('Transmission','arm-repair-estimates'); ?>
-                    <select id="arm-vehicle-transmission" name="vehicle_transmission" class="regular-text" style="width:150px;" data-selected="<?php echo esc_attr($prefill_vehicle['transmission']); ?>" data-placeholder="<?php echo esc_attr__('Select Transmission','arm-repair-estimates'); ?>">
-                      <option value=""><?php esc_html_e('Select Transmission','arm-repair-estimates'); ?></option>
-                    </select>
-                  </label>
-                  <label style="margin-left:10px;">
-                    <?php _e('Drive','arm-repair-estimates'); ?>
-                    <select id="arm-vehicle-drive" name="vehicle_drive" class="regular-text" style="width:120px;" data-selected="<?php echo esc_attr($prefill_vehicle['drive']); ?>" data-placeholder="<?php echo esc_attr__('Select Drive','arm-repair-estimates'); ?>">
-                      <option value=""><?php esc_html_e('Select Drive','arm-repair-estimates'); ?></option>
-                    </select>
-                  </label>
-                  <label style="margin-left:10px;">
-                    <?php _e('Trim','arm-repair-estimates'); ?>
-                    <select id="arm-vehicle-trim" name="vehicle_trim" class="regular-text" style="width:150px;" data-selected="<?php echo esc_attr($prefill_vehicle['trim']); ?>" data-placeholder="<?php echo esc_attr__('Select Trim','arm-repair-estimates'); ?>">
-                      <option value=""><?php esc_html_e('Select Trim','arm-repair-estimates'); ?></option>
-                    </select>
-                  </label>
+                  <div id="arm-vehicle-cascading" class="arm-vehicle-cascading" style="<?php echo $vehicle_selector_mode === 'existing' ? 'display:none;' : ''; ?>">
+                    <label>
+                      <?php _e('Year','arm-repair-estimates'); ?>
+                      <select id="arm-vehicle-year" name="vehicle_year" class="small-text" data-selected="<?php echo esc_attr($prefill_vehicle['year']); ?>" data-placeholder="<?php echo esc_attr__('Select Year','arm-repair-estimates'); ?>">
+                        <option value=""><?php esc_html_e('Select Year','arm-repair-estimates'); ?></option>
+                      </select>
+                    </label>
+                    <label style="margin-left:10px;">
+                      <?php _e('Make','arm-repair-estimates'); ?>
+                      <select id="arm-vehicle-make" name="vehicle_make" class="regular-text" style="width:120px;" data-selected="<?php echo esc_attr($prefill_vehicle['make']); ?>" data-placeholder="<?php echo esc_attr__('Select Make','arm-repair-estimates'); ?>">
+                        <option value=""><?php esc_html_e('Select Make','arm-repair-estimates'); ?></option>
+                      </select>
+                    </label>
+                    <label style="margin-left:10px;">
+                      <?php _e('Model','arm-repair-estimates'); ?>
+                      <select id="arm-vehicle-model" name="vehicle_model" class="regular-text" style="width:140px;" data-selected="<?php echo esc_attr($prefill_vehicle['model']); ?>" data-placeholder="<?php echo esc_attr__('Select Model','arm-repair-estimates'); ?>">
+                        <option value=""><?php esc_html_e('Select Model','arm-repair-estimates'); ?></option>
+                      </select>
+                    </label>
+                    <label style="margin-left:10px;">
+                      <?php _e('Engine','arm-repair-estimates'); ?>
+                      <select id="arm-vehicle-engine" name="vehicle_engine" class="regular-text" style="width:140px;" data-selected="<?php echo esc_attr($prefill_vehicle['engine']); ?>" data-placeholder="<?php echo esc_attr__('Select Engine','arm-repair-estimates'); ?>">
+                        <option value=""><?php esc_html_e('Select Engine','arm-repair-estimates'); ?></option>
+                      </select>
+                    </label>
+                    <label style="margin-left:10px;">
+                      <?php _e('Transmission','arm-repair-estimates'); ?>
+                      <select id="arm-vehicle-transmission" name="vehicle_transmission" class="regular-text" style="width:150px;" data-selected="<?php echo esc_attr($prefill_vehicle['transmission']); ?>" data-placeholder="<?php echo esc_attr__('Select Transmission','arm-repair-estimates'); ?>">
+                        <option value=""><?php esc_html_e('Select Transmission','arm-repair-estimates'); ?></option>
+                      </select>
+                    </label>
+                    <label style="margin-left:10px;">
+                      <?php _e('Drive','arm-repair-estimates'); ?>
+                      <select id="arm-vehicle-drive" name="vehicle_drive" class="regular-text" style="width:120px;" data-selected="<?php echo esc_attr($prefill_vehicle['drive']); ?>" data-placeholder="<?php echo esc_attr__('Select Drive','arm-repair-estimates'); ?>">
+                        <option value=""><?php esc_html_e('Select Drive','arm-repair-estimates'); ?></option>
+                      </select>
+                    </label>
+                    <label style="margin-left:10px;">
+                      <?php _e('Trim','arm-repair-estimates'); ?>
+                      <select id="arm-vehicle-trim" name="vehicle_trim" class="regular-text" style="width:150px;" data-selected="<?php echo esc_attr($prefill_vehicle['trim']); ?>" data-placeholder="<?php echo esc_attr__('Select Trim','arm-repair-estimates'); ?>">
+                        <option value=""><?php esc_html_e('Select Trim','arm-repair-estimates'); ?></option>
+                      </select>
+                    </label>
+                  </div>
                 </td>
               </tr>
               <tr>
@@ -539,6 +577,9 @@ class Controller {
             window.ARM_RE_EST = window.ARM_RE_EST || {};
             window.ARM_RE_EST.vehicle = window.ARM_RE_EST.vehicle || {};
             window.ARM_RE_EST.vehicle.selectedVehicleId = <?php echo wp_json_encode($selected_vehicle_id); ?>;
+            window.ARM_RE_EST.vehicle.selectorNewValue = <?php echo wp_json_encode(self::vehicle_selector_new_value()); ?>;
+            window.ARM_RE_EST.vehicle.initialOptionsHtml = <?php echo wp_json_encode($vehicle_selector_options); ?>;
+            window.ARM_RE_EST.vehicle.initialMode = <?php echo wp_json_encode($vehicle_selector_mode); ?>;
           }
 
           var jobTemplate = <?php echo wp_json_encode(self::job_block_template()); ?>;
@@ -1325,6 +1366,100 @@ public static function item_row_template() {
             return $r;
         }, $rows ?: []);
         wp_send_json_success($out);
+    }
+
+    public static function ajax_customer_vehicles() {
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['error' => 'forbidden'], 403);
+        }
+
+        $nonce = $_REQUEST['_ajax_nonce'] ?? $_REQUEST['nonce'] ?? '';
+        if (!wp_verify_nonce($nonce, 'arm_re_est_admin')) {
+            wp_send_json_error(['error' => 'invalid_nonce'], 403);
+        }
+
+        $customer_id = (int) ($_POST['customer_id'] ?? 0);
+        $selected_id = (int) ($_POST['selected_vehicle_id'] ?? 0);
+
+        if ($customer_id <= 0) {
+            wp_send_json_success([
+                'options_html' => self::build_vehicle_selector_options([], $selected_id),
+            ]);
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'arm_vehicles';
+        $columns = self::get_vehicle_table_columns();
+
+        $conditions = 'customer_id = %d';
+        if (in_array('deleted_at', $columns, true)) {
+            $conditions .= " AND (deleted_at IS NULL OR deleted_at='0000-00-00 00:00:00')";
+        }
+        $order_by = 'id DESC';
+        if (in_array('updated_at', $columns, true)) {
+            $order_by = 'updated_at DESC, id DESC';
+        }
+
+        $sql = "SELECT * FROM $table WHERE $conditions ORDER BY $order_by";
+        $rows = $wpdb->get_results($wpdb->prepare($sql, $customer_id));
+
+        $options_html = self::build_vehicle_selector_options($rows ?: [], $selected_id);
+
+        wp_send_json_success([
+            'options_html' => $options_html,
+        ]);
+    }
+
+    public static function vehicle_selector_new_value(): string {
+        return self::VEHICLE_SELECTOR_NEW_VALUE;
+    }
+
+    private static function build_vehicle_selector_options($vehicles, int $selected_id = 0): string {
+        $options = [];
+        $options[] = sprintf(
+            '<option value="">%s</option>',
+            esc_html__('Select a saved vehicle', 'arm-repair-estimates')
+        );
+
+        if (is_array($vehicles) || $vehicles instanceof \Traversable) {
+            foreach ($vehicles as $vehicle) {
+                if (!isset($vehicle->id)) {
+                    continue;
+                }
+                $options[] = sprintf(
+                    '<option value="%1$d"%2$s>%3$s</option>',
+                    (int) $vehicle->id,
+                    selected($selected_id, (int) $vehicle->id, false),
+                    esc_html(self::format_vehicle_label($vehicle))
+                );
+            }
+        }
+
+        $new_selected = $selected_id <= 0 ? ' selected="selected"' : '';
+        $options[] = sprintf(
+            '<option value="%1$s"%2$s>%3$s</option>',
+            esc_attr(self::VEHICLE_SELECTOR_NEW_VALUE),
+            $new_selected,
+            esc_html__('Add new vehicle', 'arm-repair-estimates')
+        );
+
+        return implode('', $options);
+    }
+
+    private static function format_vehicle_label($vehicle): string {
+        $parts = [];
+        if (isset($vehicle->year) && $vehicle->year) {
+            $parts[] = (string) $vehicle->year;
+        }
+        foreach (['make', 'model', 'trim', 'engine'] as $field) {
+            if (isset($vehicle->{$field}) && $vehicle->{$field} !== '') {
+                $parts[] = (string) $vehicle->{$field};
+            }
+        }
+        if (!$parts) {
+            $parts[] = sprintf(__('Vehicle #%d', 'arm-repair-estimates'), (int) ($vehicle->id ?? 0));
+        }
+        return trim(implode(' ', array_filter($parts)));
     }
 
     /** Helpers */
