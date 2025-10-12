@@ -7,6 +7,7 @@
   const rest = ARM_RE_EST.rest || {};
   const integrations = ARM_RE_EST.integrations || {};
   const partstechCfg = ARM_RE_EST.partstech || {};
+  const vehicleGlobals = ARM_RE_EST.vehicle || {};
 
   function parseNum(v) {
     const n = parseFloat(v);
@@ -78,7 +79,7 @@
     });
     if (!selects.year.length) return;
 
-    const vehicleCfg = ARM_RE_EST.vehicle || {};
+    const vehicleCfg = vehicleGlobals;
     const ajaxUrl = vehicleCfg.ajax_url || ARM_RE_EST.ajax_url || '';
     const nonce = vehicleCfg.nonce || '';
 
@@ -273,6 +274,145 @@
     };
   }
 
+  function initVehicleSelector() {
+    const $selector = $('#arm-vehicle-selector');
+    if (!$selector.length) return;
+
+    const $cascade = $('#arm-vehicle-cascading');
+    const $vehicleIdField = $('#arm-vehicle-id');
+    const $modeField = $('#arm-vehicle-selector-mode');
+    const $actionField = $('#arm-vehicle-selector-action');
+    const $hiddenIdField = $('#arm-vehicle-selector-vehicle-id');
+    const sentinel = vehicleGlobals.selectorNewValue || '__new__';
+    const i18n = ARM_RE_EST.i18n || {};
+    const placeholderText = i18n.selectSavedVehicle || 'Select a saved vehicle';
+    const addNewText = i18n.addNewVehicle || 'Add new vehicle';
+
+    function ensureBaseOptions() {
+      $selector.find('option[value=""]').remove();
+      $selector.find('option[value="' + sentinel + '"]').remove();
+      $selector.prepend($('<option>').val('').text(placeholderText));
+      $selector.append($('<option>').val(sentinel).text(addNewText));
+    }
+
+    function updateMode(mode, idValue) {
+      const normalized = mode === 'existing' ? 'existing' : 'add_new';
+      const idString = normalized === 'existing' ? String(idValue || '') : '';
+      $modeField.val(normalized);
+      $actionField.val(normalized);
+      if (normalized === 'existing' && idString) {
+        $vehicleIdField.val(idString);
+        $hiddenIdField.val(idString);
+        vehicleGlobals.selectedVehicleId = idString;
+        $cascade.hide();
+      } else {
+        $vehicleIdField.val('');
+        $hiddenIdField.val(sentinel);
+        vehicleGlobals.selectedVehicleId = '';
+        $cascade.show();
+      }
+    }
+
+    function applySelection(value) {
+      let val = value;
+      if (val === undefined || val === null || val === '') {
+        val = sentinel;
+      }
+      ensureBaseOptions();
+      if (val === sentinel) {
+        $selector.val(sentinel);
+        updateMode('add_new', '');
+        return;
+      }
+      const strVal = String(val);
+      if (!$selector.find('option[value="' + strVal + '"]').length) {
+        const fallbackLabel = strVal;
+        const $addNew = $selector.find('option[value="' + sentinel + '"]');
+        const $option = $('<option>').val(strVal).text(fallbackLabel);
+        if ($addNew.length) {
+          $addNew.before($option);
+        } else {
+          $selector.append($option);
+        }
+      }
+      $selector.val(strVal);
+      updateMode('existing', strVal);
+    }
+
+    function renderOptions(html, selected) {
+      const markup = (typeof html === 'string') ? html.trim() : '';
+      $selector.empty();
+      if (markup) {
+        const $tmp = $('<select>').html(markup);
+        $tmp.children('option').each(function () {
+          $selector.append($(this));
+        });
+      }
+      ensureBaseOptions();
+      applySelection(selected);
+    }
+
+    function reloadOptions(customerId, selected) {
+      const deferred = $.Deferred();
+      const desired = (selected === undefined || selected === null) ? vehicleGlobals.selectedVehicleId : selected;
+      if (!customerId) {
+        renderOptions('', sentinel);
+        deferred.resolve();
+        return deferred.promise();
+      }
+      $selector.prop('disabled', true).addClass('is-loading');
+      $.post(ARM_RE_EST.ajax_url, {
+        action: 'arm_re_customer_vehicles',
+        nonce: ARM_RE_EST.nonce,
+        customer_id: customerId,
+        selected_vehicle_id: (desired && desired !== sentinel) ? desired : ''
+      }).done(function (res) {
+        const html = res && res.success && res.data && typeof res.data.options_html === 'string'
+          ? res.data.options_html
+          : '';
+        const value = (desired && desired !== '') ? desired : sentinel;
+        renderOptions(html, value);
+      }).fail(function () {
+        ensureBaseOptions();
+        applySelection(desired && desired !== '' ? desired : sentinel);
+      }).always(function () {
+        $selector.prop('disabled', false).removeClass('is-loading');
+        deferred.resolve();
+      });
+      return deferred.promise();
+    }
+
+    $selector.on('change', function () {
+      const val = $selector.val();
+      if (!val || val === sentinel) {
+        applySelection(sentinel);
+      } else {
+        applySelection(val);
+      }
+    });
+
+    const initialOptions = vehicleGlobals.initialOptionsHtml || '';
+    const initialMode = vehicleGlobals.initialMode || '';
+    const initialSelected = vehicleGlobals.selectedVehicleId || '';
+    const defaultSelection = (initialMode === 'existing' && initialSelected) ? initialSelected : sentinel;
+    renderOptions(initialOptions, defaultSelection);
+
+    if (!initialOptions) {
+      const currentCustomerId = parseInt($('#arm-customer-id').val(), 10) || 0;
+      if (currentCustomerId) {
+        reloadOptions(currentCustomerId, defaultSelection);
+      }
+    }
+
+    window.ARMVehicleSelector = {
+      reload: reloadOptions,
+      selectValue: function (value) {
+        applySelection(value);
+      },
+      sentinel: sentinel
+    };
+  }
+
 
   $doc.on('input change', '.arm-it-qty, .arm-it-price, .arm-it-taxable, .arm-it-type', recalc);
 
@@ -338,6 +478,34 @@
 
     if (!$box.length) return;
 
+    const sentinelVehicle = vehicleGlobals.selectorNewValue || '__new__';
+
+    function getSentinelValue() {
+      return (window.ARMVehicleSelector && window.ARMVehicleSelector.sentinel) || sentinelVehicle;
+    }
+
+    function setVehicleToSentinel() {
+      const value = getSentinelValue();
+      if (window.ARMVehicleSelector && typeof window.ARMVehicleSelector.selectValue === 'function') {
+        window.ARMVehicleSelector.selectValue(value);
+      } else {
+        $('#arm-vehicle-selector-mode').val('add_new');
+        $('#arm-vehicle-selector-action').val('add_new');
+        $('#arm-vehicle-selector-vehicle-id').val(value);
+        $('#arm-vehicle-id').val('');
+        $('#arm-vehicle-cascading').show();
+        const $vehSel = $('#arm-vehicle-selector');
+        if ($vehSel.length) {
+          if (!$vehSel.find('option[value="' + value + '"]').length) {
+            const label = (ARM_RE_EST.i18n && ARM_RE_EST.i18n.addNewVehicle) ? ARM_RE_EST.i18n.addNewVehicle : 'Add new vehicle';
+            $vehSel.append($('<option>').val(value).text(label));
+          }
+          $vehSel.val(value);
+        }
+      }
+      vehicleGlobals.selectedVehicleId = '';
+    }
+
     let timer = null;
     function hideResults(){ $results.hide().empty(); }
 
@@ -350,11 +518,16 @@
       $('#arm-customer-fields [name=c_address]').val(c.address || '');
       $('#arm-customer-fields [name=c_city]').val(c.city || '');
       $('#arm-customer-fields [name=c_zip]').val(c.zip || '');
+      setVehicleToSentinel();
+      if (window.ARMVehicleSelector && typeof window.ARMVehicleSelector.reload === 'function') {
+        window.ARMVehicleSelector.reload(c.id, getSentinelValue());
+      }
     }
 
     $box.on('input', function(){
       const q = $box.val().trim();
       $hid.val('');
+      setVehicleToSentinel();
       if (timer) clearTimeout(timer);
       if (q.length < 2) { hideResults(); return; }
 
@@ -395,6 +568,7 @@
 
   $(recalc);
   $(initVehicleSelects);
+  $(initVehicleSelector);
 
   $doc.on('click', '.arm-copy-pay-link', function (e) {
     e.preventDefault();
