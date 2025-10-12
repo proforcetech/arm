@@ -120,17 +120,27 @@ class CustomerDetail {
         echo '<h2>Vehicles</h2>';
 
         
-        echo '<h3>Add Vehicle</h3>';
+        echo '<h3>' . esc_html__('Add Vehicle', 'arm-repair-estimates') . '</h3>';
         echo '<form method="post" class="arm-add-vehicle">';
         wp_nonce_field('arm_add_vehicle', 'arm_add_vehicle_nonce');
-        echo '<table class="form-table">
-                <tr><th>Year</th><td><input type="number" name="year" required></td></tr>
-                <tr><th>Make</th><td><input type="text" name="make" required></td></tr>
-                <tr><th>Model</th><td><input type="text" name="model" required></td></tr>
-                <tr><th>Engine</th><td><input type="text" name="engine"></td></tr>
-                <tr><th>Trim</th><td><input type="text" name="trim"></td></tr>
-              </table>';
-        submit_button('Add Vehicle');
+        echo '<div id="arm-vehicle-cascading" class="arm-vehicle-cascading" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">';
+        echo '  <label>' . esc_html__('Year', 'arm-repair-estimates') .
+             ' <select id="arm-vehicle-year" name="year" class="small-text" data-selected="" data-placeholder="' . esc_attr__('Select Year', 'arm-repair-estimates') . '" required>' .
+             '<option value="">' . esc_html__('Select Year', 'arm-repair-estimates') . '</option></select></label>';
+        echo '  <label style="margin-left:10px;">' . esc_html__('Make', 'arm-repair-estimates') .
+             ' <select id="arm-vehicle-make" name="make" class="regular-text" style="width:120px;" data-selected="" data-placeholder="' . esc_attr__('Select Make', 'arm-repair-estimates') . '" required>' .
+             '<option value="">' . esc_html__('Select Make', 'arm-repair-estimates') . '</option></select></label>';
+        echo '  <label style="margin-left:10px;">' . esc_html__('Model', 'arm-repair-estimates') .
+             ' <select id="arm-vehicle-model" name="model" class="regular-text" style="width:140px;" data-selected="" data-placeholder="' . esc_attr__('Select Model', 'arm-repair-estimates') . '" required>' .
+             '<option value="">' . esc_html__('Select Model', 'arm-repair-estimates') . '</option></select></label>';
+        echo '  <label style="margin-left:10px;">' . esc_html__('Engine', 'arm-repair-estimates') .
+             ' <select id="arm-vehicle-engine" name="engine" class="regular-text" style="width:140px;" data-selected="" data-placeholder="' . esc_attr__('Select Engine', 'arm-repair-estimates') . '">' .
+             '<option value="">' . esc_html__('Select Engine', 'arm-repair-estimates') . '</option></select></label>';
+        echo '  <label style="margin-left:10px;">' . esc_html__('Trim', 'arm-repair-estimates') .
+             ' <select id="arm-vehicle-trim" name="trim" class="regular-text" style="width:150px;" data-selected="" data-placeholder="' . esc_attr__('Select Trim', 'arm-repair-estimates') . '">' .
+             '<option value="">' . esc_html__('Select Trim', 'arm-repair-estimates') . '</option></select></label>';
+        echo '</div>';
+        submit_button(__('Add Vehicle', 'arm-repair-estimates'));
         echo '</form>';
 
         
