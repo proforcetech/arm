@@ -24,21 +24,44 @@ class CustomerDetail {
         }
 
         
+        $vehicle_fields = ['year', 'make', 'model', 'engine', 'transmission', 'drive', 'trim'];
+        $vehicle_input = array_fill_keys($vehicle_fields, '');
+
         if (!empty($_POST['arm_add_vehicle_nonce']) && wp_verify_nonce($_POST['arm_add_vehicle_nonce'], 'arm_add_vehicle')) {
-            $data = [
-                'customer_id' => $customer_id,
-                'year'        => intval($_POST['year']),
-                'make'        => sanitize_text_field($_POST['make']),
-                'model'       => sanitize_text_field($_POST['model']),
-                'engine'      => sanitize_text_field($_POST['engine']),
-                'trim'        => sanitize_text_field($_POST['trim']),
-                'created_at'  => current_time('mysql'),
-                'updated_at'  => current_time('mysql'),
-                'user_id'     => null,
-                'deleted_at'  => null,
-            ];
-            $wpdb->insert($tbl_veh, $data);
-            echo '<div class="updated"><p>Vehicle added successfully.</p></div>';
+            foreach ($vehicle_fields as $field) {
+                $key = 'vehicle_' . $field;
+                if (isset($_POST[$key])) {
+                    $value = sanitize_text_field(wp_unslash($_POST[$key]));
+                    $vehicle_input[$field] = $value;
+                }
+            }
+
+            if ($vehicle_input['year'] === '' || $vehicle_input['make'] === '' || $vehicle_input['model'] === '') {
+                echo '<div class="notice notice-error"><p>' . esc_html__('Please select a Year, Make, and Model before adding a vehicle.', 'arm-repair-estimates') . '</p></div>';
+            } else {
+                $data = [
+                    'customer_id'   => $customer_id,
+                    'year'          => $vehicle_input['year'] !== '' ? absint($vehicle_input['year']) : null,
+                    'make'          => $vehicle_input['make'],
+                    'model'         => $vehicle_input['model'],
+                    'engine'        => $vehicle_input['engine'],
+                    'transmission'  => $vehicle_input['transmission'],
+                    'drive'         => $vehicle_input['drive'],
+                    'trim'          => $vehicle_input['trim'],
+                    'created_at'    => current_time('mysql'),
+                    'updated_at'    => current_time('mysql'),
+                    'user_id'       => null,
+                    'deleted_at'    => null,
+                ];
+
+                $inserted = $wpdb->insert($tbl_veh, $data);
+                if ($inserted) {
+                    echo '<div class="updated"><p>' . esc_html__('Vehicle added successfully.', 'arm-repair-estimates') . '</p></div>';
+                    $vehicle_input = array_fill_keys($vehicle_fields, '');
+                } else {
+                    echo '<div class="notice notice-error"><p>' . esc_html__('Unable to add vehicle. Please try again.', 'arm-repair-estimates') . '</p></div>';
+                }
+            }
         }
 
         
@@ -120,17 +143,93 @@ class CustomerDetail {
         echo '<h2>Vehicles</h2>';
 
         
-        echo '<h3>Add Vehicle</h3>';
+        echo '<h3>' . esc_html__('Add Vehicle', 'arm-repair-estimates') . '</h3>';
         echo '<form method="post" class="arm-add-vehicle">';
         wp_nonce_field('arm_add_vehicle', 'arm_add_vehicle_nonce');
-        echo '<table class="form-table">
-                <tr><th>Year</th><td><input type="number" name="year" required></td></tr>
-                <tr><th>Make</th><td><input type="text" name="make" required></td></tr>
-                <tr><th>Model</th><td><input type="text" name="model" required></td></tr>
-                <tr><th>Engine</th><td><input type="text" name="engine"></td></tr>
-                <tr><th>Trim</th><td><input type="text" name="trim"></td></tr>
-              </table>';
-        submit_button('Add Vehicle');
+        echo '<div id="arm-vehicle-cascading" class="arm-vehicle-cascading" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">';
+
+        $field_configs = [
+            'year' => [
+                'label'      => esc_html__('Year', 'arm-repair-estimates'),
+                'name'       => 'vehicle_year',
+                'class'      => 'small-text',
+                'style'      => '',
+                'required'   => true,
+                'placeholder'=> esc_html__('Select Year', 'arm-repair-estimates'),
+                'label_style'=> '',
+            ],
+            'make' => [
+                'label'      => esc_html__('Make', 'arm-repair-estimates'),
+                'name'       => 'vehicle_make',
+                'class'      => 'regular-text',
+                'style'      => 'width:120px;',
+                'required'   => true,
+                'placeholder'=> esc_html__('Select Make', 'arm-repair-estimates'),
+                'label_style'=> 'margin-left:10px;',
+            ],
+            'model' => [
+                'label'      => esc_html__('Model', 'arm-repair-estimates'),
+                'name'       => 'vehicle_model',
+                'class'      => 'regular-text',
+                'style'      => 'width:140px;',
+                'required'   => true,
+                'placeholder'=> esc_html__('Select Model', 'arm-repair-estimates'),
+                'label_style'=> 'margin-left:10px;',
+            ],
+            'engine' => [
+                'label'      => esc_html__('Engine', 'arm-repair-estimates'),
+                'name'       => 'vehicle_engine',
+                'class'      => 'regular-text',
+                'style'      => 'width:140px;',
+                'required'   => false,
+                'placeholder'=> esc_html__('Select Engine', 'arm-repair-estimates'),
+                'label_style'=> 'margin-left:10px;',
+            ],
+            'transmission' => [
+                'label'      => esc_html__('Transmission', 'arm-repair-estimates'),
+                'name'       => 'vehicle_transmission',
+                'class'      => 'regular-text',
+                'style'      => 'width:150px;',
+                'required'   => false,
+                'placeholder'=> esc_html__('Select Transmission', 'arm-repair-estimates'),
+                'label_style'=> 'margin-left:10px;',
+            ],
+            'drive' => [
+                'label'      => esc_html__('Drive', 'arm-repair-estimates'),
+                'name'       => 'vehicle_drive',
+                'class'      => 'regular-text',
+                'style'      => 'width:120px;',
+                'required'   => false,
+                'placeholder'=> esc_html__('Select Drive', 'arm-repair-estimates'),
+                'label_style'=> 'margin-left:10px;',
+            ],
+            'trim' => [
+                'label'      => esc_html__('Trim', 'arm-repair-estimates'),
+                'name'       => 'vehicle_trim',
+                'class'      => 'regular-text',
+                'style'      => 'width:150px;',
+                'required'   => false,
+                'placeholder'=> esc_html__('Select Trim', 'arm-repair-estimates'),
+                'label_style'=> 'margin-left:10px;',
+            ],
+        ];
+
+        foreach ($field_configs as $field => $config) {
+            $select_id = 'arm-vehicle-' . $field;
+            $label_style = $config['label_style'] ? ' style="' . esc_attr($config['label_style']) . '"' : '';
+            $select_style = $config['style'] ? ' style="' . esc_attr($config['style']) . '"' : '';
+            $required = $config['required'] ? ' required' : '';
+            $placeholder_attr = esc_attr($config['placeholder']);
+            $selected_value = esc_attr($vehicle_input[$field]);
+
+            echo '<label' . $label_style . '>' . $config['label'];
+            echo ' <select id="' . esc_attr($select_id) . '" name="' . esc_attr($config['name']) . '" class="' . esc_attr($config['class']) . '"' . $select_style . ' data-selected="' . $selected_value . '" data-placeholder="' . $placeholder_attr . '"' . $required . '>';
+            echo '<option value="">' . esc_html($config['placeholder']) . '</option>';
+            echo '</select></label>';
+        }
+
+        echo '</div>';
+        submit_button(__('Add Vehicle', 'arm-repair-estimates'));
         echo '</form>';
 
         
