@@ -72,6 +72,7 @@ final class Activator
         $sql[] = "CREATE TABLE {$p}arm_estimates (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             customer_id BIGINT UNSIGNED NULL,
+            vehicle_id BIGINT UNSIGNED NULL,
             first_name VARCHAR(100) NULL,
             last_name VARCHAR(100) NULL,
             email VARCHAR(190) NULL,
@@ -79,6 +80,10 @@ final class Activator
             vehicle_year SMALLINT UNSIGNED NULL,
             vehicle_make VARCHAR(80) NULL,
             vehicle_model VARCHAR(120) NULL,
+            vehicle_engine VARCHAR(120) NULL,
+            vehicle_transmission VARCHAR(80) NULL,
+            vehicle_drive VARCHAR(32) NULL,
+            vehicle_trim VARCHAR(120) NULL,
             vin VARCHAR(32) NULL,
             plate VARCHAR(32) NULL,
             status VARCHAR(40) NOT NULL DEFAULT 'DRAFT',
@@ -93,6 +98,7 @@ final class Activator
             PRIMARY KEY (id),
             KEY idx_status (status),
             KEY idx_customer (customer_id),
+            KEY idx_vehicle (vehicle_id),
             KEY idx_created (created_at)
         ) $charset;";
 

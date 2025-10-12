@@ -9,8 +9,16 @@ class SchemaFix {
         global $wpdb;
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
-        
-        
+        $estimates_table = $wpdb->prefix . 'arm_estimates';
+        self::addColumn($estimates_table, 'vehicle_id', 'BIGINT UNSIGNED NULL');
+        self::addColumn($estimates_table, 'vehicle_year', 'SMALLINT UNSIGNED NULL');
+        self::addColumn($estimates_table, 'vehicle_make', 'VARCHAR(80) NULL');
+        self::addColumn($estimates_table, 'vehicle_model', 'VARCHAR(120) NULL');
+        self::addColumn($estimates_table, 'vehicle_engine', 'VARCHAR(120) NULL');
+        self::addColumn($estimates_table, 'vehicle_transmission', 'VARCHAR(80) NULL');
+        self::addColumn($estimates_table, 'vehicle_drive', 'VARCHAR(32) NULL');
+        self::addColumn($estimates_table, 'vehicle_trim', 'VARCHAR(120) NULL');
+
         self::ensurePrimaryKey($wpdb->prefix . 'arm_customers', 'id');
         self::ensurePrimaryKey($wpdb->prefix . 'arm_appointments', 'id');
 
@@ -27,8 +35,9 @@ class SchemaFix {
         );
 
         
-        self::addIndex($wpdb->prefix . 'arm_estimates', 'idx_arm_estimates_customer_id', ['customer_id']);
-        self::addIndex($wpdb->prefix . 'arm_estimates', 'idx_arm_estimates_request_id', ['request_id']);
+        self::addIndex($estimates_table, 'idx_arm_estimates_customer_id', ['customer_id']);
+        self::addIndex($estimates_table, 'idx_arm_estimates_request_id', ['request_id']);
+        self::addIndex($estimates_table, 'idx_arm_estimates_vehicle_id', ['vehicle_id']);
 
         self::addIndex($wpdb->prefix . 'arm_estimate_jobs', 'idx_arm_estimate_jobs_estimate_id', ['estimate_id']);
 
@@ -66,7 +75,7 @@ class SchemaFix {
 
     private static function modifyColumn(string $table, string $column, string $definition): void {
         global $wpdb;
-        
+
         $exists = $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
@@ -82,11 +91,39 @@ class SchemaFix {
         }
     }
 
+    private static function addColumn(string $table, string $column, string $definition): void {
+        global $wpdb;
+
+        $column = sanitize_key($column);
+        $definition = trim($definition);
+        $table_clean = preg_replace('/[^A-Za-z0-9_]/', '', $table);
+        if ($column === '' || $definition === '' || $table_clean === '') {
+            return;
+        }
+
+        $exists = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA=DATABASE()
+                   AND TABLE_NAME=%s
+                   AND COLUMN_NAME=%s
+                 LIMIT 1",
+                $table_clean,
+                $column
+            )
+        );
+        if ($exists) {
+            return;
+        }
+
+        $wpdb->query("ALTER TABLE `$table_clean` ADD COLUMN `$column` $definition");
+    }
+
     private static function addIndex(string $table, string $indexName, array $columns, string $type = 'INDEX'): void {
         global $wpdb;
-        if (empty($columns)) return; 
+        if (empty($columns)) return;
 
-        
+
         $exists = $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS
