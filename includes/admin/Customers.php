@@ -135,15 +135,17 @@ final class Customers {
             foreach ($rows as $r) {
                 $name = trim(($r->first_name ?? '') . ' ' . ($r->last_name ?? ''));
                 $addr = trim(($r->address ?? '') . ( ($r->city ?? '') ? ', '.$r->city : '' ) . ( ($r->state ?? '') ? ', '.$r->state : '' ) . ( ($r->zip ?? '') ? ' '.$r->zip : '' ));
-                $edit = \admin_url('admin.php?page=arm-repair-customers&action=edit&id='.(int)$r->id);
-                $del  = \wp_nonce_url(\admin_url('admin-post.php?action=arm_re_customer_delete&id='.(int)$r->id), 'arm_re_customer_delete');
+                $detail = \admin_url('admin.php?page=arm-customer-detail&id='.(int)$r->id);
+                $edit   = \admin_url('admin.php?page=arm-repair-customers&action=edit&id='.(int)$r->id);
+                $del    = \wp_nonce_url(\admin_url('admin-post.php?action=arm_re_customer_delete&id='.(int)$r->id), 'arm_re_customer_delete');
                 echo '<tr>';
                 echo '<td>'.esc_html($name ?: '').'</td>';
                 echo '<td>'.esc_html($r->email ?: '').'</td>';
                 echo '<td>'.esc_html($r->phone ?: '').'</td>';
                 echo '<td>'.esc_html($addr ?: '').'</td>';
                 echo '<td>'.esc_html($r->created_at ?: '').'</td>';
-                echo '<td><a href="'.esc_url($edit).'">'.esc_html__('Edit', 'arm-repair-estimates').'</a> | '
+                echo '<td><a href="'.esc_url($detail).'">'.esc_html__('Details', 'arm-repair-estimates').'</a> | '
+                   . '<a href="'.esc_url($edit).'">'.esc_html__('Edit', 'arm-repair-estimates').'</a> | '
                    . '<a href="'.esc_url($del).'" onclick="return confirm(\''.esc_js(__('Delete this customer?', 'arm-repair-estimates')).'\');">'.esc_html__('Delete', 'arm-repair-estimates').'</a></td>';
                 echo '</tr>';
             }
