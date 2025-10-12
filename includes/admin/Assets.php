@@ -7,7 +7,7 @@ class Assets {
         add_action('admin_enqueue_scripts', [__CLASS__, 'enqueue']);
     }
     public static function enqueue($hook) {
-        if (strpos($hook, 'arm-repair') === false) return;
+        if (!self::should_enqueue_for($hook)) return;
         global $wpdb;
         $ajax_url = admin_url('admin-ajax.php');
         $vehicle_years = [];
@@ -56,5 +56,20 @@ class Assets {
                 'addNewVehicle'     => __('Add new vehicle', 'arm-repair-estimates'),
             ],
         ]);
+    }
+    protected static function should_enqueue_for($value) {
+        if (!is_string($value) || $value === '') {
+            return false;
+        }
+
+        if (strpos($value, 'arm-repair') !== false) {
+            return true;
+        }
+
+        if (strpos($value, 'arm-customer-detail') !== false) {
+            return true;
+        }
+
+        return strncmp($value, 'arm-', 4) === 0;
     }
 }

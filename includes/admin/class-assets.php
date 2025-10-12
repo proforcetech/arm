@@ -23,11 +23,11 @@ final class Assets {
         if (function_exists('get_current_screen')) {
             $screen = get_current_screen();
             if ($screen && is_object($screen) && isset($screen->id) && is_string($screen->id)) {
-                $should_load = (strpos($screen->id, 'arm-repair') !== false);
+                $should_load = self::should_enqueue_for($screen->id);
             }
         }
         if (!$should_load && is_string($hook)) {
-            $should_load = (strpos($hook, 'arm-repair') !== false);
+            $should_load = self::should_enqueue_for($hook);
         }
         if (!$should_load) return;
 
@@ -117,6 +117,20 @@ final class Assets {
         $path = rtrim(\ARM_RE_PATH, '/\\') . '/' . ltrim($relative, '/');
         $mtime = @filemtime($path);
         return $mtime ? (string) $mtime : (string) \ARM_RE_VERSION;
+    }
+
+    private static function should_enqueue_for(string $value): bool {
+        if ($value === '') return false;
+
+        if (strpos($value, 'arm-repair') !== false) {
+            return true;
+        }
+
+        if (strpos($value, 'arm-customer-detail') !== false) {
+            return true;
+        }
+
+        return strncmp($value, 'arm-', 4) === 0;
     }
 }
 }
