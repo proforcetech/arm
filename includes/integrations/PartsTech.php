@@ -67,16 +67,23 @@ class PartsTech {
         if ($query === '') wp_send_json_error(['error' => 'query required'], 400);
         $vehicle = isset($_POST['vehicle']) && is_array($_POST['vehicle']) ? array_map('sanitize_text_field', $_POST['vehicle']) : [];
         $payload = [
-            'keyword' => $query,
-            'vehicle' => array_filter([
-                'year'  => $vehicle['year'] ?? null,
-                'make'  => $vehicle['make'] ?? null,
-                'model' => $vehicle['model'] ?? null,
-                'engine'=> $vehicle['engine'] ?? null,
-            ]),
-            'includePricing' => true,
+            'query' => [
+                'keyword' => $query,
+            ],
+            'options' => [
+                'includePricing' => true,
+            ],
         ];
-        $resp = self::request('POST', '/catalog/v1/parts/search', $payload);
+        $vehiclePayload = array_filter([
+            'year'  => $vehicle['year'] ?? null,
+            'make'  => $vehicle['make'] ?? null,
+            'model' => $vehicle['model'] ?? null,
+            'engine'=> $vehicle['engine'] ?? null,
+        ]);
+        if (!empty($vehiclePayload)) {
+            $payload['vehicle'] = $vehiclePayload;
+        }
+        $resp = self::request('POST', '/catalog/v2/parts/search', $payload);
         if (!empty($resp['error'])) wp_send_json_error(['error' => $resp['error']], 500);
         $results = [];
         foreach (($resp['items'] ?? []) as $item) {
@@ -103,6 +110,7 @@ class PartsTech {
             'timeout' => 20,
             'headers' => [
                 'Content-Type' => 'application/json',
+                'Accept'       => 'application/json',
                 'Authorization' => 'Bearer ' . $apiKey,
                 'X-Api-Key'    => $apiKey,
             ],
@@ -114,21 +122,45 @@ class PartsTech {
         }
         $resp = wp_remote_request($url, $args);
         if (is_wp_error($resp)) {
-            self::log_error('request_failed', $resp->get_error_message());
+            self::log_error('request_failed', $resp->get_error_message(), $resp->get_error_message());
             return ['error' => $resp->get_error_message()];
         }
-        $data = json_decode((string) wp_remote_retrieve_body($resp), true);
+        $body_raw = (string) wp_remote_retrieve_body($resp);
+        $data = json_decode($body_raw, true);
         if (!is_array($data)) {
-            self::log_error('invalid_response', wp_remote_retrieve_body($resp));
+            self::log_error('invalid_response', $body_raw);
             return ['error' => __('Invalid response from PartsTech', 'arm-repair-estimates')];
+        }
+        $status = (int) wp_remote_retrieve_response_code($resp);
+        if ($status >= 400) {
+            $message = self::extract_error_message($data) ?: sprintf(__('PartsTech request failed (HTTP %d)', 'arm-repair-estimates'), $status);
+            self::log_error('http_' . $status, $data, $message);
+            return ['error' => $message, 'status' => $status];
         }
         return $data;
     }
 
-    private static function log_error(string $code, $detail): void {
+    private static function extract_error_message(array $data): ?string {
+        if (!empty($data['message']) && is_string($data['message'])) {
+            return $data['message'];
+        }
+        if (!empty($data['error']) && is_string($data['error'])) {
+            return $data['error'];
+        }
+        if (!empty($data['errors']) && is_array($data['errors'])) {
+            foreach ($data['errors'] as $error) {
+                if (is_array($error) && !empty($error['message']) && is_string($error['message'])) {
+                    return $error['message'];
+                }
+            }
+        }
+        return null;
+    }
+
+    private static function log_error(string $code, $detail, ?string $displayMessage = null): void {
         set_transient('arm_re_notice_partstech', [
             'type' => 'error',
-            'message' => sprintf(__('PartsTech error (%s). See logs for details.', 'arm-repair-estimates'), $code),
+            'message' => $displayMessage ? sprintf(__('PartsTech error: %s', 'arm-repair-estimates'), $displayMessage) : sprintf(__('PartsTech error (%s). See logs for details.', 'arm-repair-estimates'), $code),
         ], MINUTE_IN_SECONDS * 10);
         Logger::log('integration', 0, 'partstech_error', 'system', [
             'code'   => $code,
