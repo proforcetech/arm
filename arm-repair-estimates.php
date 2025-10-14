@@ -26,6 +26,9 @@ add_action('plugins_loaded', function () {
     ARM\Admin\Settings::boot();
     ARM\Admin\Services::boot();
     ARM\Admin\Vehicles::boot();
+    ARM\Admin\Inventory::boot();
+    ARM\Admin\InventoryAlerts::boot();
+    ARM\Admin\DashboardWidget::boot();
     ARM\Admin\WarrantyClaims::boot();
     ARM\Customer\WarrantyClaims::boot();
     ARM\Appointments\Admin::boot();
