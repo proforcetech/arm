@@ -15,6 +15,9 @@ class Ajax {
         $eT = $wpdb->prefix.'arm_estimates';
         $est = $wpdb->get_row($wpdb->prepare("SELECT * FROM $eT WHERE token=%s", $token));
         if (!$est) wp_send_json_error(['msg'=>'Estimate not found']);
+        if ((int) ($est->technician_id ?? 0) <= 0) {
+            wp_send_json_error(['msg' => __('A technician has not been assigned to this estimate yet. Please contact us to continue.', 'arm-repair-estimates')]);
+        }
         if (in_array($est->status, ['APPROVED','DECLINED'], true)) wp_send_json_success(['status'=>$est->status]);
         $wpdb->update($eT, ['status'=>'APPROVED','approved_at'=>current_time('mysql'),'updated_at'=>current_time('mysql')], ['id'=>$est->id]);
         \ARM\Audit\Logger::log('estimate', $est->id, 'approved', 'customer', []);

@@ -98,26 +98,30 @@ class Controller {
         global $wpdb;
         $eT = $wpdb->prefix.'arm_estimates';
         $iT = $wpdb->prefix.'arm_estimate_items';
+        $jT = $wpdb->prefix.'arm_estimate_jobs';
         $cT = $wpdb->prefix.'arm_customers';
         $est = $wpdb->get_row($wpdb->prepare("SELECT * FROM $eT WHERE id=%d", $id));
         if (!$est) wp_die('Estimate not found');
 
         $items = $wpdb->get_results($wpdb->prepare("SELECT * FROM $iT WHERE estimate_id=%d ORDER BY sort_order ASC, id ASC", $est->id));
+        $jobs  = $wpdb->get_results($wpdb->prepare("SELECT * FROM $jT WHERE estimate_id=%d ORDER BY sort_order ASC, id ASC", $est->id));
         $cust  = $wpdb->get_row($wpdb->prepare("SELECT * FROM $cT WHERE id=%d", $est->customer_id));
-        return self::estimate_html($est, $items, $cust);
+        return self::estimate_html($est, $items, $cust, $jobs);
     }
 
     private static function render_estimate_html_by_token($token) {
         global $wpdb;
         $eT = $wpdb->prefix.'arm_estimates';
         $iT = $wpdb->prefix.'arm_estimate_items';
+        $jT = $wpdb->prefix.'arm_estimate_jobs';
         $cT = $wpdb->prefix.'arm_customers';
         $est = $wpdb->get_row($wpdb->prepare("SELECT * FROM $eT WHERE token=%s", $token));
         if (!$est) wp_die('Estimate not found');
 
         $items = $wpdb->get_results($wpdb->prepare("SELECT * FROM $iT WHERE estimate_id=%d ORDER BY sort_order ASC, id ASC", $est->id));
+        $jobs  = $wpdb->get_results($wpdb->prepare("SELECT * FROM $jT WHERE estimate_id=%d ORDER BY sort_order ASC, id ASC", $est->id));
         $cust  = $wpdb->get_row($wpdb->prepare("SELECT * FROM $cT WHERE id=%d", $est->customer_id));
-        return self::estimate_html($est, $items, $cust);
+        return self::estimate_html($est, $items, $cust, $jobs);
     }
 
     private static function render_invoice_html_by_id($id) {
@@ -148,9 +152,31 @@ class Controller {
 
     /** HTML templates */
 
-    private static function estimate_html($est, $items, $cust) {
+    private static function estimate_html($est, $items, $cust, $jobs = []) {
         $header = self::shop_header_html();
         $terms  = wp_kses_post(get_option('arm_re_terms_html',''));
+        $technicians = \ARM\Estimates\Controller::get_technician_directory();
+        $assigned_label = '';
+        if (!empty($est->technician_id) && isset($technicians[(int) $est->technician_id])) {
+            $assigned_label = self::formatTechnicianLabel($technicians[(int) $est->technician_id]);
+        }
+        $job_assignments = [];
+        if ($jobs) {
+            foreach ($jobs as $job) {
+                $job_title = trim((string) ($job->title ?? ''));
+                if ($job_title === '') {
+                    $job_title = __('Untitled Job', 'arm-repair-estimates');
+                }
+                $label = __('Unassigned', 'arm-repair-estimates');
+                if (!empty($job->technician_id) && isset($technicians[(int) $job->technician_id])) {
+                    $formatted = self::formatTechnicianLabel($technicians[(int) $job->technician_id]);
+                    if ($formatted !== '') {
+                        $label = $formatted;
+                    }
+                }
+                $job_assignments[] = sprintf('%s — %s', $job_title, $label);
+            }
+        }
         ob_start(); ?>
         <html><head><meta charset="utf-8"><title><?php echo esc_html($est->estimate_no); ?></title>
         <style>
@@ -166,6 +192,9 @@ class Controller {
         <h2><?php echo esc_html(sprintf(__('Estimate %s','arm-repair-estimates'), $est->estimate_no)); ?></h2>
         <p class="muted"><?php echo esc_html(sprintf(__('Status: %s','arm-repair-estimates'), $est->status)); ?>
         <?php if(!empty($est->expires_at)) echo ' • ' . esc_html(sprintf(__('Expires: %s','arm-repair-estimates'), $est->expires_at)); ?></p>
+        <?php if ($assigned_label !== ''): ?>
+          <p class="muted"><?php _e('Assigned Technician','arm-repair-estimates'); ?>: <?php echo esc_html($assigned_label); ?></p>
+        <?php endif; ?>
 
         <?php if ($cust): ?>
           <p><strong><?php echo esc_html($cust->first_name.' '.$cust->last_name); ?></strong><br>
@@ -195,6 +224,15 @@ class Controller {
           </tbody>
         </table>
 
+        <?php if ($job_assignments): ?>
+        <h3 style="margin-top:12px;"><?php _e('Job Assignments','arm-repair-estimates'); ?></h3>
+        <ul>
+          <?php foreach ($job_assignments as $line): ?>
+            <li><?php echo esc_html($line); ?></li>
+          <?php endforeach; ?>
+        </ul>
+        <?php endif; ?>
+
         <p class="right" style="margin-top:10px;">
           <?php _e('Subtotal','arm-repair-estimates'); ?>: <?php echo esc_html(number_format((float)$est->subtotal,2)); ?><br>
           <?php _e('Tax','arm-repair-estimates'); ?>: <?php echo esc_html(number_format((float)$est->tax_amount,2)); ?><br>
@@ -214,6 +252,19 @@ class Controller {
         </body></html>
         <?php
         return ob_get_clean();
+    }
+
+    private static function formatTechnicianLabel(array $tech): string
+    {
+        $name = trim((string) ($tech['name'] ?? ''));
+        $email = trim((string) ($tech['email'] ?? ''));
+        if ($name === '' && $email === '') {
+            return '';
+        }
+        if ($name !== '' && $email !== '') {
+            return sprintf('%s (%s)', $name, $email);
+        }
+        return $name !== '' ? $name : $email;
     }
 
     private static function invoice_html($inv, $items, $cust) {

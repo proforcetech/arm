@@ -62,6 +62,7 @@ final class PublicView {
         $tblE = $wpdb->prefix.'arm_estimates';
         $tblI = $wpdb->prefix.'arm_estimate_items';
         $tblC = $wpdb->prefix.'arm_customers';
+        $tblJ = $wpdb->prefix.'arm_estimate_jobs';
 
         $est = $wpdb->get_row($wpdb->prepare("SELECT * FROM $tblE WHERE token=%s", $token));
         if (!$est) { status_header(404); wp_die(__('Estimate not found.', 'arm-repair-estimates')); }
@@ -71,13 +72,31 @@ final class PublicView {
             "SELECT * FROM $tblI WHERE estimate_id=%d ORDER BY sort_order ASC, id ASC",
             (int)$est->id
         ));
+        $jobs = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM $tblJ WHERE estimate_id=%d ORDER BY sort_order ASC, id ASC",
+            (int) $est->id
+        ));
         $cust = $wpdb->get_row($wpdb->prepare(
             "SELECT * FROM $tblC WHERE id=%d",
             (int)$est->customer_id
         ));
         $terms = wp_kses_post(get_option('arm_re_terms_html', ''));
 
-        
+
+        $technicians = Controller::get_technician_directory();
+        $assigned_technician = null;
+        if (!empty($est->technician_id) && isset($technicians[(int) $est->technician_id])) {
+            $assigned_technician = $technicians[(int) $est->technician_id];
+        }
+        if ($jobs) {
+            foreach ($jobs as $job) {
+                $job->assigned_technician = (!empty($job->technician_id) && isset($technicians[(int) $job->technician_id]))
+                    ? $technicians[(int) $job->technician_id]
+                    : null;
+            }
+        }
+
+
         $shop = (object)[
             'name'    => get_option('arm_re_shop_name',''),
             'address' => get_option('arm_re_shop_address',''),
@@ -91,7 +110,7 @@ final class PublicView {
         get_header();
 
         
-        $ARM_RE_ESTIMATE_CONTEXT = compact('est','items','cust','terms','shop');
+        $ARM_RE_ESTIMATE_CONTEXT = compact('est','items','cust','terms','shop','jobs','assigned_technician');
 
         
         $tpl = defined('ARM_RE_PATH')

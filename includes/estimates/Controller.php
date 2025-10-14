@@ -7,6 +7,123 @@ class Controller {
 
     private const VEHICLE_SELECTOR_NEW_VALUE = '__new__';
 
+    /**
+     * Cached technician directory for option rendering & lookups.
+     *
+     * @var array<int,array{id:int,name:string,email:string}>
+     */
+    private static $technicianDirectory;
+
+    /**
+     * Retrieve a keyed directory of available technicians.
+     *
+     * @return array<int,array{id:int,name:string,email:string}>
+     */
+    public static function get_technician_directory(): array {
+        if (is_array(self::$technicianDirectory)) {
+            return self::$technicianDirectory;
+        }
+
+        $args = [
+            'role__in' => ['arm_technician', 'technician'],
+            'orderby'  => 'display_name',
+            'order'    => 'ASC',
+            'fields'   => ['ID', 'display_name', 'user_email', 'user_login'],
+        ];
+
+        $users = \get_users($args);
+
+        if (empty($users)) {
+            $users = \get_users([
+                'orderby' => 'display_name',
+                'order'   => 'ASC',
+                'fields'  => ['ID', 'display_name', 'user_email', 'user_login'],
+            ]);
+        }
+
+        /**
+         * Allow 3rd parties to filter the list of assignable technicians.
+         *
+         * @param array $users
+         */
+        $users = apply_filters('arm_re_estimate_technicians', $users);
+
+        $directory = [];
+
+        if (is_array($users)) {
+            foreach ($users as $user) {
+                if ($user instanceof \WP_User) {
+                    $directory[(int) $user->ID] = [
+                        'id'    => (int) $user->ID,
+                        'name'  => $user->display_name ?: $user->user_login,
+                        'email' => (string) $user->user_email,
+                    ];
+                } elseif (is_array($user) && isset($user['ID'])) {
+                    $directory[(int) $user['ID']] = [
+                        'id'    => (int) $user['ID'],
+                        'name'  => (string) ($user['display_name'] ?? $user['user_login'] ?? ''),
+                        'email' => (string) ($user['user_email'] ?? ''),
+                    ];
+                }
+            }
+        }
+
+        self::$technicianDirectory = $directory;
+
+        return self::$technicianDirectory;
+    }
+
+    /**
+     * Build HTML option list for technician selects.
+     */
+    private static function render_technician_options(array $technicians, int $selected_id = 0): string {
+        $options = [];
+        $options[] = sprintf(
+            '<option value="">%s</option>',
+            esc_html__('Select a technician', 'arm-repair-estimates')
+        );
+
+        if (empty($technicians)) {
+            $options[] = sprintf(
+                '<option value="" disabled>%s</option>',
+                esc_html__('No technicians found', 'arm-repair-estimates')
+            );
+        } else {
+            foreach ($technicians as $tech) {
+                if (empty($tech['id'])) {
+                    continue;
+                }
+                $label = self::format_technician_label($tech);
+                $options[] = sprintf(
+                    '<option value="%1$d"%2$s>%3$s</option>',
+                    (int) $tech['id'],
+                    selected($selected_id, (int) $tech['id'], false),
+                    esc_html($label)
+                );
+            }
+        }
+
+        return implode('', $options);
+    }
+
+    /**
+     * Format a technician label for display.
+     */
+    private static function format_technician_label(array $tech): string {
+        $name = trim((string) ($tech['name'] ?? ''));
+        $email = trim((string) ($tech['email'] ?? ''));
+        if ($name === '' && $email === '') {
+            return __('Unnamed Technician', 'arm-repair-estimates');
+        }
+        if ($email === '') {
+            return $name;
+        }
+        if ($name === '') {
+            return $email;
+        }
+        return sprintf('%s (%s)', $name, $email);
+    }
+
     /** ----------------------------------------------------------------
      * Boot: hooks (admin + public actions used by the estimates module)
      * -----------------------------------------------------------------*/
@@ -62,6 +179,7 @@ class Controller {
             version INT NOT NULL DEFAULT 1,
             approved_at DATETIME NULL,
             signature_id BIGINT UNSIGNED NULL,
+            technician_id BIGINT UNSIGNED NULL,
             subtotal DECIMAL(12,2) NOT NULL DEFAULT 0,
             tax_rate DECIMAL(5,2) NOT NULL DEFAULT 0,
             tax_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
@@ -77,7 +195,7 @@ class Controller {
             updated_at DATETIME NULL,
             UNIQUE KEY estimate_no (estimate_no),
             UNIQUE KEY token (token),
-            INDEX(customer_id), INDEX(request_id), INDEX(vehicle_id),
+            INDEX(customer_id), INDEX(request_id), INDEX(vehicle_id), INDEX(technician_id),
             PRIMARY KEY(id)
         ) $charset;");
 
@@ -88,8 +206,9 @@ class Controller {
             is_optional TINYINT(1) NOT NULL DEFAULT 0,
             status ENUM('PENDING','APPROVED','REJECTED') NOT NULL DEFAULT 'PENDING',
             sort_order INT NOT NULL DEFAULT 0,
+            technician_id BIGINT UNSIGNED NULL,
             PRIMARY KEY(id),
-            INDEX(estimate_id)
+            INDEX(estimate_id), INDEX(technician_id)
         ) $charset;");
 
         dbDelta("CREATE TABLE $items (
@@ -225,6 +344,7 @@ class Controller {
             'estimate_no'=> self::generate_estimate_no(),
             'status'=>'DRAFT',
             'customer_id'=>0,
+            'technician_id'=>0,
             'vehicle_id'=>0,
             'request_id'=>null,
             'tax_rate'=> (float) get_option('arm_re_tax_rate',0),
@@ -253,6 +373,7 @@ class Controller {
         $selected_vehicle_id = 0;
         $selected_vehicle_row = null;
         $customer_vehicle_rows = [];
+        $technicians = self::get_technician_directory();
 
         if ($id) {
             $estimate = $wpdb->get_row($wpdb->prepare("SELECT * FROM $tblE WHERE id=%d", $id));
@@ -383,6 +504,15 @@ class Controller {
                   </select>
                 </td>
               </tr>
+              <tr>
+                <th><label for="arm-technician-id"><?php _e('Assigned Technician','arm-repair-estimates'); ?></label></th>
+                <td>
+                  <select name="technician_id" id="arm-technician-id" class="regular-text">
+                    <?php echo self::render_technician_options($technicians, (int) ($estimate->technician_id ?? 0)); ?>
+                  </select>
+                  <p class="description"><?php _e('Select the lead technician responsible for this estimate before approval.','arm-repair-estimates'); ?></p>
+                </td>
+              </tr>
 
               <!-- Customer Search / Select -->
               <tr>
@@ -505,11 +635,11 @@ class Controller {
               
               if ($jobs) {
                   foreach ($jobs as $j) {
-                      self::render_job_block($j->id, $j->title, (int)$j->is_optional, (int)$j->sort_order, $items);
+                      self::render_job_block($j->id, $j->title, (int)$j->is_optional, (int)$j->sort_order, $items, (int) ($j->technician_id ?? 0), $technicians);
                   }
               } else {
-                  
-                  self::render_job_block(0, '', 0, 0, []);
+
+                  self::render_job_block(0, '', 0, 0, [], 0, $technicians);
               }
               ?>
             </div>
@@ -583,6 +713,7 @@ class Controller {
           }
 
           var jobTemplate = <?php echo wp_json_encode(self::job_block_template()); ?>;
+          var technicianOptions = <?php echo wp_json_encode(self::render_technician_options($technicians)); ?>;
           var rowTemplate = <?php echo wp_json_encode(self::item_row_template()); ?>;
           var customerNonce = '<?php echo wp_create_nonce('arm_re_est_admin'); ?>';
           var taxApply = '<?php echo esc_js(get_option('arm_re_tax_apply','parts_labor')); ?>';
@@ -611,6 +742,7 @@ class Controller {
               .replace(/__JOB_INDEX__/g, index)
               .replace(/__JOB_TITLE__/g, '')
               .replace(/__JOB_OPT_CHECKED__/g, '')
+              .replace('__JOB_TECH_OPTIONS__', technicianOptions)
               .replace('__JOB_ROWS__', rows);
           }
 
@@ -774,6 +906,14 @@ class Controller {
                 <?php esc_html_e('Optional Job', 'arm-repair-estimates'); ?>
               </label>
             </p>
+            <p>
+              <label>
+                <?php esc_html_e('Assigned Technician', 'arm-repair-estimates'); ?>
+                <select name="jobs[__JOB_INDEX__][technician_id]" class="arm-job-technician">
+                  __JOB_TECH_OPTIONS__
+                </select>
+              </label>
+            </p>
             <table class="widefat striped arm-job-items">
               <thead>
                 <tr>
@@ -800,7 +940,7 @@ class Controller {
     }
 
     /** Render a Job block with its items (filtered by job_id) */
-    private static function render_job_block($job_id, $title, $is_optional, $sort_order, $all_items) {
+    private static function render_job_block($job_id, $title, $is_optional, $sort_order, $all_items, $technician_id = 0, array $technicians = []) {
         $index = max(0, (int)$sort_order);
         $items = array_filter($all_items, function($it) use ($job_id){
             return (int)$it->job_id === (int)$job_id;
@@ -821,6 +961,7 @@ class Controller {
         $html = str_replace('__JOB_INDEX__', esc_attr($index), $html);
         $html = str_replace('__JOB_TITLE__', esc_attr($title), $html);
         $html = str_replace('__JOB_OPT_CHECKED__', $is_optional ? 'checked' : '', $html);
+        $html = str_replace('__JOB_TECH_OPTIONS__', self::render_technician_options($technicians, (int) $technician_id), $html);
         $html = str_replace('__JOB_ROWS__', $rows_html, $html);
         echo $html;
     }
@@ -904,6 +1045,15 @@ public static function item_row_template() {
         $estimate_no = sanitize_text_field($_POST['estimate_no']);
         $status = in_array($_POST['status'] ?? 'DRAFT', ['DRAFT','SENT','APPROVED','DECLINED','EXPIRED','NEEDS_REAPPROVAL'], true) ? $_POST['status'] : 'DRAFT';
         $customer_id = intval($_POST['customer_id'] ?? 0);
+        $technicians_dir = self::get_technician_directory();
+        $technician_id = intval($_POST['technician_id'] ?? 0);
+        if ($technician_id > 0 && !isset($technicians_dir[$technician_id])) {
+            $technician_id = 0;
+        }
+
+        if ($status === 'APPROVED' && $technician_id <= 0) {
+            wp_die(__('A technician must be assigned before approving an estimate.', 'arm-repair-estimates'));
+        }
 
         
         $cdata = [
@@ -947,7 +1097,16 @@ public static function item_row_template() {
             foreach ($jobs_post as $jIdx => $job) {
                 $title = sanitize_text_field($job['title'] ?? '');
                 $is_optional = !empty($job['is_optional']) ? 1 : 0;
-                $jobs_to_insert[] = ['title'=>$title ?: sprintf(__('Job %d','arm-repair-estimates'), $sortj+1), 'is_optional'=>$is_optional, 'sort'=>$sortj++];
+                $jobTech = isset($job['technician_id']) ? intval($job['technician_id']) : 0;
+                if ($jobTech > 0 && !isset($technicians_dir[$jobTech])) {
+                    $jobTech = 0;
+                }
+                $jobs_to_insert[] = [
+                    'title'=>$title ?: sprintf(__('Job %d','arm-repair-estimates'), $sortj+1),
+                    'is_optional'=>$is_optional,
+                    'sort'=>$sortj++,
+                    'technician_id'=>$jobTech,
+                ];
                 $items = $job['items'] ?? [];
                 $rowi = 0;
                 foreach ($items as $row) {
@@ -977,7 +1136,7 @@ public static function item_row_template() {
                 $prepared_items[] = ['type'=>$type,'desc'=>$desc,'qty'=>$qty,'price'=>$price,'tax'=>$tax,'ltot'=>$ltot,'sort'=>$rowGlobal++,'job_local_index'=>0];
                 $rowi++;
             }
-            $jobs_to_insert[] = ['title'=>__('Job 1','arm-repair-estimates'), 'is_optional'=>0, 'sort'=>0];
+            $jobs_to_insert[] = ['title'=>__('Job 1','arm-repair-estimates'), 'is_optional'=>0, 'sort'=>0, 'technician_id'=>$technician_id];
         }
 
         
@@ -998,6 +1157,7 @@ public static function item_row_template() {
             'estimate_no'=>$estimate_no,
             'status'=>$status,
             'customer_id'=>$customer_id,
+            'technician_id'=>$technician_id ?: null,
             'vehicle_id'=>$vehicle_id ?: null,
             'vehicle_year'=>$vehicle_snapshot['vehicle_year'] ?? null,
             'vehicle_make'=>$vehicle_snapshot['vehicle_make'] ?? null,
@@ -1040,7 +1200,8 @@ public static function item_row_template() {
                 'title'=>$j['title'],
                 'is_optional'=>$j['is_optional'],
                 'status'=>'PENDING',
-                'sort_order'=>$j['sort']
+                'sort_order'=>$j['sort'],
+                'technician_id'=>!empty($j['technician_id']) ? (int)$j['technician_id'] : null,
             ]);
             $job_db_ids[] = (int)$wpdb->insert_id;
         }
@@ -1306,6 +1467,7 @@ public static function item_row_template() {
         global $wpdb;
         $tblE = $wpdb->prefix.'arm_estimates';
         $tblC = $wpdb->prefix.'arm_customers';
+        $tblJ = $wpdb->prefix.'arm_estimate_jobs';
         $id = intval($_GET['id'] ?? 0);
         $est = $wpdb->get_row($wpdb->prepare("SELECT * FROM $tblE WHERE id=%d", $id));
         if (!$est) wp_die('Estimate not found');
@@ -1313,12 +1475,50 @@ public static function item_row_template() {
         $cust = $wpdb->get_row($wpdb->prepare("SELECT * FROM $tblC WHERE id=%d", $est->customer_id));
         if (!$cust || !$cust->email) wp_die('Customer email missing');
 
+        $jobs = $wpdb->get_results($wpdb->prepare(
+            "SELECT title, technician_id FROM $tblJ WHERE estimate_id=%d ORDER BY sort_order ASC, id ASC",
+            (int) $est->id
+        ));
+        $technicians = self::get_technician_directory();
+        $assigned_tech = !empty($est->technician_id) && isset($technicians[(int) $est->technician_id])
+            ? $technicians[(int) $est->technician_id]
+            : null;
+
         $link = add_query_arg(['arm_estimate'=>$est->token], home_url('/'));
         $subj = sprintf('Estimate %s from %s', $est->estimate_no, wp_parse_url(home_url(), PHP_URL_HOST));
         $body = "Hello {$cust->first_name},\n\n"
               . "Please review your estimate {$est->estimate_no} here:\n$link\n\n"
               . "Total: $" . number_format((float)$est->total,2) . "\n\n"
-              . "You can accept or decline on that page.\n\nThank you!";
+              . "You can accept or decline on that page.\n\n";
+
+        $assignment_lines = [];
+        if ($assigned_tech) {
+            $assignment_lines[] = sprintf(
+                /* translators: %s technician display name */
+                __('Assigned Technician: %s', 'arm-repair-estimates'),
+                self::format_technician_label($assigned_tech)
+            );
+        }
+        if ($jobs) {
+            $assignment_lines[] = __('Job Assignments:', 'arm-repair-estimates');
+            foreach ($jobs as $job) {
+                $job_label = __('Unassigned', 'arm-repair-estimates');
+                if (!empty($job->technician_id) && isset($technicians[(int) $job->technician_id])) {
+                    $job_label = self::format_technician_label($technicians[(int) $job->technician_id]);
+                }
+                $title = trim((string) ($job->title ?? ''));
+                if ($title === '') {
+                    $title = __('Untitled Job', 'arm-repair-estimates');
+                }
+                $assignment_lines[] = sprintf('- %1$s — %2$s', $title, $job_label);
+            }
+        }
+        if ($assignment_lines) {
+            $body .= implode("\n", $assignment_lines) . "\n\n";
+        }
+
+        $body .= "Thank you!";
+
         wp_mail($cust->email, $subj, $body);
 
         if ($est->status === 'DRAFT') {
@@ -1338,6 +1538,12 @@ public static function item_row_template() {
         $status = in_array($_GET['status'] ?? '', ['APPROVED','DECLINED','EXPIRED'], true) ? $_GET['status'] : '';
         if (!$status) wp_die('Invalid status');
         $tblE = $wpdb->prefix.'arm_estimates';
+        if ($status === 'APPROVED') {
+            $est = $wpdb->get_row($wpdb->prepare("SELECT technician_id FROM $tblE WHERE id=%d", $id));
+            if (!$est || (int) ($est->technician_id ?? 0) <= 0) {
+                wp_die(__('Assign a technician before approving this estimate.', 'arm-repair-estimates'));
+            }
+        }
         $wpdb->update($tblE, ['status'=>$status,'updated_at'=>current_time('mysql')], ['id'=>$id]);
         wp_redirect(admin_url('admin.php?page=arm-repair-estimates-builder&action=edit&id='.$id.'&marked=1'));
         exit;
