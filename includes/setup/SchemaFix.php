@@ -10,6 +10,7 @@ class SchemaFix {
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
         $estimates_table = $wpdb->prefix . 'arm_estimates';
+        $jobs_table      = $wpdb->prefix . 'arm_estimate_jobs';
         self::addColumn($estimates_table, 'vehicle_id', 'BIGINT UNSIGNED NULL');
         self::addColumn($estimates_table, 'vehicle_year', 'SMALLINT UNSIGNED NULL');
         self::addColumn($estimates_table, 'vehicle_make', 'VARCHAR(80) NULL');
@@ -18,6 +19,8 @@ class SchemaFix {
         self::addColumn($estimates_table, 'vehicle_transmission', 'VARCHAR(80) NULL');
         self::addColumn($estimates_table, 'vehicle_drive', 'VARCHAR(32) NULL');
         self::addColumn($estimates_table, 'vehicle_trim', 'VARCHAR(120) NULL');
+        self::addColumn($estimates_table, 'technician_id', 'BIGINT UNSIGNED NULL');
+        self::addColumn($jobs_table, 'technician_id', 'BIGINT UNSIGNED NULL');
 
         self::ensurePrimaryKey($wpdb->prefix . 'arm_customers', 'id');
         self::ensurePrimaryKey($wpdb->prefix . 'arm_appointments', 'id');
@@ -38,8 +41,10 @@ class SchemaFix {
         self::addIndex($estimates_table, 'idx_arm_estimates_customer_id', ['customer_id']);
         self::addIndex($estimates_table, 'idx_arm_estimates_request_id', ['request_id']);
         self::addIndex($estimates_table, 'idx_arm_estimates_vehicle_id', ['vehicle_id']);
+        self::addIndex($estimates_table, 'idx_arm_estimates_technician_id', ['technician_id']);
 
         self::addIndex($wpdb->prefix . 'arm_estimate_jobs', 'idx_arm_estimate_jobs_estimate_id', ['estimate_id']);
+        self::addIndex($wpdb->prefix . 'arm_estimate_jobs', 'idx_arm_estimate_jobs_technician_id', ['technician_id']);
 
         self::addIndex($wpdb->prefix . 'arm_estimate_items', 'idx_arm_estimate_items_estimate_id', ['estimate_id']);
         self::addIndex($wpdb->prefix . 'arm_estimate_items', 'idx_arm_estimate_items_job_id', ['job_id']);

@@ -226,6 +226,10 @@ final class Activator {
             \ARM\Appointments\Installer::install_tables();
         }
 
+        if (class_exists('\\ARM\\Estimates\\Controller')) {
+            \ARM\Estimates\Controller::install_tables();
+        }
+
         if (defined('ARM_RE_VERSION')) {
             update_option('arm_re_version', ARM_RE_VERSION);
         }

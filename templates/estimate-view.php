@@ -12,6 +12,24 @@ $label = [
     'NEEDS_REAPPROVAL' => __('Needs Re-Approval', 'arm-repair-estimates'),
 ];
 $can_act = in_array($est->status, ['SENT','NEEDS_REAPPROVAL'], true);
+$formatTech = static function ($tech) {
+    if (!is_array($tech)) {
+        return '';
+    }
+    $name = trim((string) ($tech['name'] ?? ''));
+    $email = trim((string) ($tech['email'] ?? ''));
+    if ($name === '' && $email === '') {
+        return '';
+    }
+    if ($name !== '' && $email !== '') {
+        return sprintf('%s (%s)', $name, $email);
+    }
+    return $name !== '' ? $name : $email;
+};
+$assigned_label = '';
+if (!empty($assigned_technician) && is_array($assigned_technician)) {
+    $assigned_label = $formatTech($assigned_technician);
+}
 ?>
 <div class="arm-estimate-wrap arm-container" style="max-width:960px;margin:24px auto;">
   <div class="arm-card" style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:24px;box-shadow:0 1px 2px rgba(0,0,0,0.04)">
@@ -54,7 +72,30 @@ $can_act = in_array($est->status, ['SENT','NEEDS_REAPPROVAL'], true);
           <div><strong><?php _e('Expires', 'arm-repair-estimates'); ?>:</strong> <?php echo esc_html($est->expires_at); ?></div>
         <?php endif; ?>
         <div><strong><?php _e('Created', 'arm-repair-estimates'); ?>:</strong> <?php echo esc_html($est->created_at); ?></div>
+        <div><strong><?php _e('Assigned Technician', 'arm-repair-estimates'); ?>:</strong> <?php echo esc_html($assigned_label !== '' ? $assigned_label : __('Unassigned', 'arm-repair-estimates')); ?></div>
       </div>
+      <?php if (!empty($jobs)): ?>
+      <div style="flex:1 1 280px;">
+        <h3 style="margin:0 0 8px;"><?php _e('Job Assignments', 'arm-repair-estimates'); ?></h3>
+        <ul style="margin:0;padding-left:18px;">
+          <?php foreach ($jobs as $job):
+              $job_title = trim((string) ($job->title ?? ''));
+              if ($job_title === '') {
+                  $job_title = __('Untitled Job', 'arm-repair-estimates');
+              }
+              $job_label = __('Unassigned', 'arm-repair-estimates');
+              if (!empty($job->assigned_technician) && is_array($job->assigned_technician)) {
+                  $formatted = $formatTech($job->assigned_technician);
+                  if ($formatted !== '') {
+                      $job_label = $formatted;
+                  }
+              }
+          ?>
+            <li><strong><?php echo esc_html($job_title); ?></strong> — <?php echo esc_html($job_label); ?></li>
+          <?php endforeach; ?>
+        </ul>
+      </div>
+      <?php endif; ?>
     </div>
 
     <div style="margin-top:16px;overflow:auto;">
@@ -150,43 +191,7 @@ $can_act = in_array($est->status, ['SENT','NEEDS_REAPPROVAL'], true);
         <?php else: ?>
           <div class="notice" style="margin-top:16px;"><p><?php _e('This estimate is not currently actionable.', 'arm-repair-estimates'); ?></p></div>
         <?php endif; ?>
-  <?php if ($estimate->status === 'PENDING'): ?>
-    <div id="arm-estimate-approval">
-      <h3><?php _e('Review & Approve','arm-repair-estimates'); ?></h3>
-      <p><?php _e('Please review the estimate below and either approve or reject.','arm-repair-estimates'); ?></p>
 
-      <label>
-        <input type="checkbox" id="arm_accept_checkbox"> 
-        <?php _e('I approve this estimate and authorize the work.','arm-repair-estimates'); ?>
-      </label>
-
-      <div id="arm_signature_wrap">
-        <p><?php _e('Signature:','arm-repair-estimates'); ?></p>
-        <canvas id="arm_signature_pad" width="400" height="150" style="border:1px solid #ccc;"></canvas>
-        <button type="button" id="arm_clear_signature"><?php _e('Clear','arm-repair-estimates'); ?></button>
-      </div>
-
-      <div class="arm-actions">
-        <button type="button" id="arm_btn_approve" class="arm-btn"><?php _e('Approve Estimate','arm-repair-estimates'); ?></button>
-        <button type="button" id="arm_btn_reject" class="arm-btn arm-reject"><?php _e('Reject Estimate','arm-repair-estimates'); ?></button>
-      </div>
-    </div>
-  <?php endif; ?>
-
-  <div id="arm-appointment-form" style="display:none;">
-    <h3><?php _e('Book an Appointment','arm-repair-estimates'); ?></h3>
-    <label for="arm_appt_date"><?php _e('Choose Date','arm-repair-estimates'); ?></label>
-    <input type="date" id="arm_appt_date" name="appt_date">
-
-    <div id="arm_appt_slots_wrap" style="margin-top:1em; display:none;">
-      <label for="arm_appt_slot"><?php _e('Choose Time','arm-repair-estimates'); ?></label>
-      <select id="arm_appt_slot" name="appt_slot"></select>
-    </div>
-
-    <button type="button" id="arm_book_appt" class="arm-btn"><?php _e('Book Appointment','arm-repair-estimates'); ?></button>
-    <div id="arm_appt_msg" class="arm-msg"></div>
-  </div>
-</div>
       <?php endif; ?>
     </div>
 

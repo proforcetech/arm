@@ -19,6 +19,55 @@ $shop = [
 ];
 if (class_exists('ARM_RE_Zoho')) { ARM_RE_Zoho::estimate_approved($est); }
 
+$formatTech = static function($tech) {
+    if (!is_array($tech)) {
+        return '';
+    }
+    $name = trim((string)($tech['name'] ?? ''));
+    $email = trim((string)($tech['email'] ?? ''));
+    if ($name === '' && $email === '') {
+        return '';
+    }
+    if ($name !== '' && $email !== '') {
+        return sprintf('%s (%s)', $name, $email);
+    }
+    return $name !== '' ? $name : $email;
+};
+$assigned_label = '';
+$techDirectory = [];
+if (class_exists('ARM\\Estimates\\Controller')) {
+    $techDirectory = \ARM\Estimates\Controller::get_technician_directory();
+}
+if (!empty($assigned_technician) && is_array($assigned_technician)) {
+    $assigned_label = $formatTech($assigned_technician);
+} elseif (!empty($est->technician_id) && isset($techDirectory[(int) $est->technician_id])) {
+    $assigned_label = $formatTech($techDirectory[(int) $est->technician_id]);
+}
+$job_assignments = [];
+if (!empty($jobs) && (is_array($jobs) || $jobs instanceof \Traversable)) {
+    foreach ($jobs as $job) {
+        $title = isset($job->title) && trim((string) $job->title) !== '' ? trim((string) $job->title) : __('Untitled Job', 'arm-repair-estimates');
+        $label = __('Unassigned', 'arm-repair-estimates');
+        $techData = null;
+        if (isset($job->assigned_technician) && is_array($job->assigned_technician)) {
+            $techData = $job->assigned_technician;
+        }
+        if (!$techData && isset($job->technician) && is_array($job->technician)) {
+            $techData = $job->technician;
+        }
+        if (!$techData && isset($job->technician_id) && isset($techDirectory[(int) $job->technician_id])) {
+            $techData = $techDirectory[(int) $job->technician_id];
+        }
+        if ($techData) {
+            $formatted = $formatTech($techData);
+            if ($formatted !== '') {
+                $label = $formatted;
+            }
+        }
+        $job_assignments[] = sprintf('%s — %s', $title, $label);
+    }
+}
+
 ?>
 <table style="width:100%;margin-bottom:10px;"><tr>
   <td style="width:60%;">
@@ -36,7 +85,17 @@ if (class_exists('ARM_RE_Zoho')) { ARM_RE_Zoho::estimate_approved($est); }
 <p class="small">
 Customer: <?php echo esc_html($cust->first_name.' '.$cust->last_name); ?> — <?php echo esc_html($cust->email); ?><br>
 Status: <?php echo esc_html($est->status); ?><?php if ($est->expires_at) echo ' — Expires: '.esc_html($est->expires_at); ?>
+<?php if ($assigned_label !== ''): ?><br><?php _e('Assigned Technician','arm-repair-estimates'); ?>: <?php echo esc_html($assigned_label); ?><?php endif; ?>
 </p>
+
+<?php if ($job_assignments): ?>
+<h3><?php _e('Job Assignments','arm-repair-estimates'); ?></h3>
+<ul>
+  <?php foreach ($job_assignments as $line): ?>
+    <li><?php echo esc_html($line); ?></li>
+  <?php endforeach; ?>
+</ul>
+<?php endif; ?>
 
 <table>
 <thead><tr><th>Type</th><th>Description</th><th class="right">Qty</th><th class="right">Unit</th><th class="right">Line</th></tr></thead>
