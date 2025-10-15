@@ -304,5 +304,8 @@ final class Activator
         if (!wp_next_scheduled('arm_re_cleanup')) {
             wp_schedule_event(time() + HOUR_IN_SECONDS, 'daily', 'arm_re_cleanup');
         }
+        if (!wp_next_scheduled('arm_re_send_reminders')) {
+            wp_schedule_event(time() + (5 * MINUTE_IN_SECONDS), 'hourly', 'arm_re_send_reminders');
+        }
     }
 }
