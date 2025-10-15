@@ -24,9 +24,11 @@ final class Activator {
         
         self::require_modules();
 
-        $charset        = $wpdb->get_charset_collate();
-        $vehicles_table = $wpdb->prefix . 'arm_vehicles';
-        $service_table  = $wpdb->prefix . 'arm_service_types';
+        $charset              = $wpdb->get_charset_collate();
+        $vehicles_table       = $wpdb->prefix . 'arm_vehicles';
+        $service_table        = $wpdb->prefix . 'arm_service_types';
+        $time_entries_table   = $wpdb->prefix . 'arm_time_entries';
+        $time_adjust_table    = $wpdb->prefix . 'arm_time_adjustments';
 
         self::install_vehicle_schema();
 
@@ -79,6 +81,45 @@ final class Activator {
             KEY sort (sort_order)
         ) $charset;");
 
+
+        dbDelta("CREATE TABLE $time_entries_table (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            job_id BIGINT UNSIGNED NOT NULL,
+            estimate_id BIGINT UNSIGNED NOT NULL,
+            technician_id BIGINT UNSIGNED NOT NULL,
+            source ENUM('technician','admin') NOT NULL DEFAULT 'technician',
+            start_at DATETIME NOT NULL,
+            end_at DATETIME NULL,
+            duration_minutes INT UNSIGNED NULL,
+            notes TEXT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL,
+            PRIMARY KEY  (id),
+            KEY idx_job (job_id),
+            KEY idx_estimate (estimate_id),
+            KEY idx_technician (technician_id),
+            KEY idx_open (technician_id, end_at)
+        ) $charset;");
+
+
+        dbDelta("CREATE TABLE $time_adjust_table (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            time_entry_id BIGINT UNSIGNED NOT NULL,
+            admin_id BIGINT UNSIGNED NOT NULL,
+            action VARCHAR(32) NOT NULL DEFAULT 'update',
+            previous_start DATETIME NULL,
+            previous_end DATETIME NULL,
+            previous_duration INT NULL,
+            new_start DATETIME NULL,
+            new_end DATETIME NULL,
+            new_duration INT NULL,
+            reason TEXT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            KEY idx_entry (time_entry_id),
+            KEY idx_admin (admin_id)
+        ) $charset;");
+
         
         $count = (int) $wpdb->get_var("SELECT COUNT(*) FROM $service_table");
         if ($count === 0) {
@@ -113,6 +154,9 @@ final class Activator {
         }
         if (class_exists('\\ARM\\Audit\\Logger')) {
             \ARM\Audit\Logger::install_tables();
+        }
+        if (class_exists('\\ARM\\TimeLogs\\Controller')) {
+            \ARM\TimeLogs\Controller::install_tables();
         }
         if (class_exists('\\ARM\\PDF\\Controller')) {
             \ARM\PDF\Controller::install_tables();
@@ -243,6 +287,7 @@ final class Activator {
             '\\ARM\\Invoices\\Controller'  => 'includes/invoices/Controller.php',
             '\\ARM\\Bundles\\Controller'   => 'includes/bundles/Controller.php',
             '\\ARM\\Audit\\Logger'     => 'includes/audit/Logger.php',
+            '\\ARM\\TimeLogs\\Controller' => 'includes/timelogs/Controller.php',
             '\\ARM\\PDF\\Controller'       => 'includes/pdf/Controller.php',
             '\\ARM\\Integrations\\Payments_Stripe'  => 'includes/integrations/Payments_Stripe.php',
             '\\ARM\\Integrations\\Payments_PayPal'    => 'includes/integrations/Payments_PayPal.php',

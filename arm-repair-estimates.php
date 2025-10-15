@@ -61,4 +61,5 @@ add_action('plugins_loaded', function () {
 
     ARM\PDF\Generator::boot();
     ARM\Audit\Logger::boot();
+    ARM\TimeLogs\Controller::boot();
 });
