@@ -364,6 +364,10 @@ final class Activator {
             \ARM\Estimates\Controller::install_tables();
         }
 
+        if (class_exists('\\ARM\\Inspections\\Installer')) {
+            \ARM\Inspections\Installer::install_tables();
+        }
+
         \ARM\Accounting\Transactions::install_tables();
 
         if (defined('ARM_RE_VERSION')) {
@@ -384,6 +388,7 @@ final class Activator {
             '\\ARM\\Integrations\\Payments_Stripe'  => 'includes/integrations/Payments_Stripe.php',
             '\\ARM\\Integrations\\Payments_PayPal'    => 'includes/integrations/Payments_PayPal.php',
             '\\ARM\\Links\\Shortlinks'      => 'includes/links/class-shortlinks.php',
+            '\\ARM\\Inspections\\Installer'    => 'includes/inspections/Installer.php',
         ];
         foreach ($map as $class => $rel) {
             if (!class_exists($class) && file_exists(ARM_RE_PATH . $rel)) {

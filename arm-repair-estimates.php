@@ -37,6 +37,7 @@ add_action('plugins_loaded', function () {
     ARM\Customer\WarrantyClaims::boot();
     ARM\Appointments\Admin::boot();
     ARM\Appointments\Admin_Availability::boot();
+    ARM\Inspections\Admin::boot();
 
     ARM\Public\Assets::boot();
     ARM\Public\Shortcode_Form::boot();
@@ -70,4 +71,6 @@ add_action('plugins_loaded', function () {
     ARM\Audit\Logger::boot();
     ARM\TimeLogs\Controller::boot();
     ARM\Reminders\Scheduler::boot();
+    ARM\Inspections\Reports::boot();
+    ARM\Inspections\PublicView::boot();
 });

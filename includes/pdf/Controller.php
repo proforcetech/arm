@@ -16,11 +16,13 @@ class Controller {
         
         add_action('admin_post_arm_re_pdf_estimate', [__CLASS__, 'admin_pdf_estimate']);
         add_action('admin_post_arm_re_pdf_invoice',  [__CLASS__, 'admin_pdf_invoice']);
+        add_action('admin_post_arm_re_pdf_inspection', [__CLASS__, 'admin_pdf_inspection']);
 
         
         add_filter('query_vars', function($vars){
             $vars[] = 'arm_estimate_pdf';
             $vars[] = 'arm_invoice_pdf';
+            $vars[] = 'arm_inspection_pdf';
             return $vars;
         });
         add_action('template_redirect', [__CLASS__, 'public_pdf_if_requested']);
@@ -48,24 +50,38 @@ class Controller {
         self::stream_pdf_or_html($html, "invoice-$id.pdf");
     }
 
+    public static function admin_pdf_inspection() {
+        if (!current_user_can('manage_options')) wp_die('Nope');
+        check_admin_referer('arm_re_pdf_inspection');
+        $id = (int)($_GET['id'] ?? 0);
+        if (!$id) wp_die('Missing inspection id');
+
+        $html = self::render_inspection_html_by_id($id);
+        self::stream_pdf_or_html($html, "inspection-$id.pdf");
+    }
+
     public static function public_pdf_if_requested() {
         $est_token = get_query_var('arm_estimate_pdf');
         $inv_token = get_query_var('arm_invoice_pdf');
-        if (!$est_token && !$inv_token) return;
+        $insp_token = get_query_var('arm_inspection_pdf');
+        if (!$est_token && !$inv_token && !$insp_token) return;
 
         if ($est_token) {
             $html = self::render_estimate_html_by_token($est_token);
             self::stream_pdf_or_html($html, "estimate.pdf");
-        } else {
+        } elseif ($inv_token) {
             $html = self::render_invoice_html_by_token($inv_token);
             self::stream_pdf_or_html($html, "invoice.pdf");
+        } else {
+            $html = self::render_inspection_html_by_token($insp_token);
+            self::stream_pdf_or_html($html, "inspection.pdf");
         }
         exit;
     }
 
     /** ------------------------- HTML builders ----------------------- */
 
-    private static function shop_header_html() {
+    public static function shop_header_html() {
         $logo = esc_url(get_option('arm_re_logo_url',''));
         $name = esc_html(get_option('arm_re_shop_name',''));
         $addr = wp_kses_post(get_option('arm_re_shop_address',''));
@@ -148,6 +164,22 @@ class Controller {
         $items = $wpdb->get_results($wpdb->prepare("SELECT * FROM $itT WHERE invoice_id=%d ORDER BY sort_order ASC, id ASC", $inv->id));
         $cust  = $wpdb->get_row($wpdb->prepare("SELECT * FROM $cT WHERE id=%d", $inv->customer_id));
         return self::invoice_html($inv, $items, $cust);
+    }
+
+    private static function render_inspection_html_by_id($id) {
+        $inspection = \ARM\Inspections\Reports::get_with_details((int) $id);
+        if (!$inspection) {
+            wp_die('Inspection not found');
+        }
+        return \ARM\Inspections\Reports::render_html($inspection);
+    }
+
+    private static function render_inspection_html_by_token($token) {
+        $inspection = \ARM\Inspections\Reports::get_by_token((string) $token);
+        if (!$inspection) {
+            wp_die('Inspection not found');
+        }
+        return \ARM\Inspections\Reports::render_html($inspection);
     }
 
     /** HTML templates */

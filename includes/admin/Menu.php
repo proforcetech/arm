@@ -100,6 +100,15 @@ class Menu
 
         add_submenu_page(
             'arm-repair-estimates',
+            __('Inspection Templates', 'arm-repair-estimates'),
+            __('Inspections', 'arm-repair-estimates'),
+            'manage_options',
+            'arm-repair-inspections',
+            ['ARM\\Inspections\\Admin', 'render']
+        );
+
+        add_submenu_page(
+            'arm-repair-estimates',
             __('Dashboard', 'arm-repair-estimates'),
             __('Dashboard', 'arm-repair-estimates'),
             'manage_options',
