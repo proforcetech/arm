@@ -2,6 +2,8 @@
 namespace ARM\PublicSite;
 if (!defined('ABSPATH')) exit;
 
+use ARM\Reminders\Preferences;
+
 class Ajax_Submit {
     public static function boot() {
         add_action('wp_ajax_arm_submit_estimate', [__CLASS__, 'handle']);
@@ -33,6 +35,23 @@ class Ajax_Submit {
         if (($del_email+$del_sms+$del_both) === 0) wp_send_json_error(['message'=>'Select a delivery preference']);
         if ($del_email && $del_sms) $del_both = 1;
 
+        $reminder_channel = isset($_POST['reminder_channel']) ? sanitize_key($_POST['reminder_channel']) : 'email';
+        if (!in_array($reminder_channel, ['none','email','sms','both'], true)) {
+            $reminder_channel = 'email';
+        }
+        $reminder_lead = isset($_POST['reminder_lead_days']) ? (int) $_POST['reminder_lead_days'] : 3;
+        if ($reminder_lead < 0) {
+            $reminder_lead = 0;
+        }
+        $reminder_hour = isset($_POST['reminder_hour']) ? (int) $_POST['reminder_hour'] : 9;
+        if ($reminder_hour < 0) {
+            $reminder_hour = 0;
+        }
+        if ($reminder_hour > 23) {
+            $reminder_hour = 23;
+        }
+        $reminder_timezone = isset($_POST['reminder_timezone']) ? sanitize_text_field($_POST['reminder_timezone']) : wp_timezone_string();
+
         global $wpdb; $tbl = $wpdb->prefix.'arm_estimate_requests';
         $data = [
             'vehicle_year'  => $other ? null : intval($_POST['vehicle_year']),
@@ -62,7 +81,18 @@ class Ajax_Submit {
         $ok = $wpdb->insert($tbl, $data);
         if (!$ok) wp_send_json_error(['message'=>'DB error']);
 
-        
+        Preferences::upsert_for_contact([
+            'email'             => $data['email'],
+            'phone'             => $data['phone'],
+            'preferred_channel' => $reminder_channel,
+            'lead_days'         => $reminder_lead,
+            'preferred_hour'    => $reminder_hour,
+            'timezone'          => $reminder_timezone,
+            'is_active'         => $reminder_channel === 'none' ? 0 : 1,
+            'source'            => 'estimate_form',
+        ]);
+
+
         $admin_email = sanitize_email(get_option('arm_re_notify_email', get_option('admin_email')));
         if ($admin_email) {
             $subj = sprintf('[Estimate Request] %s %s', $data['first_name'], $data['last_name']);

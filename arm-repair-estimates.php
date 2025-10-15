@@ -31,6 +31,7 @@ add_action('plugins_loaded', function () {
     ARM\Admin\FinancialReports::boot();
     ARM\Admin\Vehicles::boot();
     ARM\Admin\WarrantyClaims::boot();
+    ARM\Admin\Reminders::boot();
     ARM\Customer\WarrantyClaims::boot();
     ARM\Appointments\Admin::boot();
     ARM\Appointments\Admin_Availability::boot();
@@ -66,4 +67,5 @@ add_action('plugins_loaded', function () {
     ARM\PDF\Generator::boot();
     ARM\Audit\Logger::boot();
     ARM\TimeLogs\Controller::boot();
+    ARM\Reminders\Scheduler::boot();
 });

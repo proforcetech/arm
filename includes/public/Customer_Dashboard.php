@@ -3,6 +3,7 @@ namespace ARM\Public;
 
 if (!defined('ABSPATH')) exit;
 
+use ARM\Reminders\Preferences;
 use WP_Post;
 use WP_User;
 
@@ -12,6 +13,7 @@ class Customer_Dashboard {
         add_shortcode('arm_customer_dashboard', [__CLASS__, 'render_dashboard']);
         add_action('wp_enqueue_scripts', [__CLASS__, 'enqueue_assets']);
         add_action('wp_ajax_arm_vehicle_crud', [__CLASS__, 'ajax_vehicle_crud']);
+        add_action('init', [__CLASS__, 'handle_profile_update']);
     }
 
     public static function enqueue_assets(): void {
@@ -195,11 +197,17 @@ class Customer_Dashboard {
     }
 
     private static function render_profile(WP_User $user, object $customer): void {
+        $prefs = Preferences::get_for_customer((int) $customer->id);
+        $channel = $prefs->preferred_channel ?? 'email';
+        $lead    = (int) ($prefs->lead_days ?? 3);
+        $hour    = (int) ($prefs->preferred_hour ?? 9);
+        $tz      = $prefs->timezone ?? wp_timezone_string();
+        $phone   = $prefs->phone ?? $customer->phone ?? '';
         ?>
         <h3><?php esc_html_e('My Profile', 'arm-repair-estimates'); ?></h3>
         <p><?php echo esc_html($customer->first_name . ' ' . $customer->last_name); ?><br>
         <?php echo esc_html($customer->email); ?><br>
-        <?php if (!empty($customer->phone)) : echo esc_html($customer->phone) . '<br>'; endif; ?></p>
+        <?php if ($phone) : echo esc_html($phone) . '<br>'; endif; ?></p>
 
         <form method="post">
             <?php wp_nonce_field('arm_update_profile', 'arm_profile_nonce'); ?>
@@ -209,9 +217,130 @@ class Customer_Dashboard {
             <label><?php esc_html_e('Email', 'arm-repair-estimates'); ?>
                 <input type="email" name="user_email" value="<?php echo esc_attr($user->user_email); ?>">
             </label>
+            <label><?php esc_html_e('Preferred Phone for SMS', 'arm-repair-estimates'); ?>
+                <input type="text" name="reminder_phone" value="<?php echo esc_attr($phone); ?>">
+            </label>
+
+            <fieldset class="arm-reminder-preferences">
+                <legend><?php esc_html_e('Reminder Preferences', 'arm-repair-estimates'); ?></legend>
+                <label><?php esc_html_e('Channel', 'arm-repair-estimates'); ?>
+                    <select name="reminder_channel">
+                        <?php
+                        $channels = [
+                            'email' => __('Email', 'arm-repair-estimates'),
+                            'sms'   => __('SMS', 'arm-repair-estimates'),
+                            'both'  => __('Email & SMS', 'arm-repair-estimates'),
+                            'none'  => __('Do not send reminders', 'arm-repair-estimates'),
+                        ];
+                        foreach ($channels as $key => $label) {
+                            printf('<option value="%1$s" %2$s>%3$s</option>', esc_attr($key), selected($channel, $key, false), esc_html($label));
+                        }
+                        ?>
+                    </select>
+                </label>
+                <label><?php esc_html_e('Lead Time (days)', 'arm-repair-estimates'); ?>
+                    <input type="number" min="0" max="30" name="reminder_lead_days" value="<?php echo esc_attr($lead); ?>">
+                </label>
+                <label><?php esc_html_e('Preferred Hour', 'arm-repair-estimates'); ?>
+                    <select name="reminder_hour">
+                        <?php for ($i = 0; $i < 24; $i++) : ?>
+                            <option value="<?php echo $i; ?>" <?php selected($hour, $i); ?>><?php echo esc_html(date_i18n('g A', strtotime(sprintf('%02d:00', $i)))); ?></option>
+                        <?php endfor; ?>
+                    </select>
+                </label>
+                <label><?php esc_html_e('Time Zone', 'arm-repair-estimates'); ?>
+                    <?php echo self::timezone_select('reminder_timezone', $tz); ?>
+                </label>
+            </fieldset>
+
             <button type="submit"><?php esc_html_e('Update Profile', 'arm-repair-estimates'); ?></button>
         </form>
         <?php
+    }
+
+    public static function handle_profile_update(): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            return;
+        }
+        if (empty($_POST['arm_profile_nonce']) || !wp_verify_nonce($_POST['arm_profile_nonce'], 'arm_update_profile')) {
+            return;
+        }
+        if (!is_user_logged_in()) {
+            return;
+        }
+
+        $user = wp_get_current_user();
+        $customer = self::resolve_customer_for_user($user, true);
+        if (!$customer) {
+            return;
+        }
+
+        $display_name = sanitize_text_field(wp_unslash($_POST['display_name'] ?? ''));
+        $user_email   = sanitize_email(wp_unslash($_POST['user_email'] ?? ''));
+        $phone        = sanitize_text_field(wp_unslash($_POST['reminder_phone'] ?? ''));
+
+        $update = ['ID' => $user->ID];
+        if ($display_name !== '') {
+            $update['display_name'] = $display_name;
+        }
+        if ($user_email !== '' && is_email($user_email)) {
+            $update['user_email'] = $user_email;
+        }
+        if (count($update) > 1) {
+            wp_update_user($update);
+        }
+
+        if ($phone !== '') {
+            update_user_meta($user->ID, 'phone', $phone);
+        }
+
+        $channel = isset($_POST['reminder_channel']) ? sanitize_key($_POST['reminder_channel']) : 'email';
+        if (!in_array($channel, ['none', 'email', 'sms', 'both'], true)) {
+            $channel = 'email';
+        }
+        $lead_days = isset($_POST['reminder_lead_days']) ? (int) $_POST['reminder_lead_days'] : 3;
+        if ($lead_days < 0) {
+            $lead_days = 0;
+        }
+        $hour = isset($_POST['reminder_hour']) ? (int) $_POST['reminder_hour'] : 9;
+        if ($hour < 0) {
+            $hour = 0;
+        }
+        if ($hour > 23) {
+            $hour = 23;
+        }
+        $tz = isset($_POST['reminder_timezone']) ? sanitize_text_field(wp_unslash($_POST['reminder_timezone'])) : wp_timezone_string();
+
+        Preferences::upsert([
+            'customer_id'       => (int) $customer->id,
+            'email'             => $user_email ?: $customer->email,
+            'phone'             => $phone ?: ($customer->phone ?? ''),
+            'preferred_channel' => $channel,
+            'lead_days'         => $lead_days,
+            'preferred_hour'    => $hour,
+            'timezone'          => $tz,
+            'is_active'         => $channel === 'none' ? 0 : 1,
+            'source'            => 'customer_portal',
+        ]);
+
+        $redirect = add_query_arg('updated', '1', wp_get_referer() ?: home_url());
+        wp_safe_redirect($redirect);
+        exit;
+    }
+
+    private static function timezone_select(string $name, string $selected = ''): string
+    {
+        if ($selected === '') {
+            $selected = wp_timezone_string();
+        }
+
+        $field = wp_timezone_choice($selected, get_user_locale());
+        $attr  = esc_attr($name);
+        $field = preg_replace('/name="timezone_string"/', 'name="' . $attr . '"', $field, 1);
+        $field = preg_replace('/id="timezone_string"/', 'id="' . $attr . '"', $field, 1);
+
+        return $field ?: '';
     }
 
     public static function resolve_customer_for_user(WP_User $user, bool $create_if_missing = true): ?object {

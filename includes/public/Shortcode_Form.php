@@ -83,6 +83,43 @@ class Shortcode_Form {
           </div>
           <p class="arm-sms-consent"><small><?php _e('By providing a telephone number and opting to receiving estimates by SMS and submitting this form you are consenting to be contacted by SMS text message. Message & data rates may apply. You can reply STOP to opt-out of further messaging.','arm-repair-estimates'); ?></small></p>
 
+          <h3><?php _e('Reminder Preferences','arm-repair-estimates'); ?></h3>
+          <div class="arm-grid">
+            <div>
+              <label for="arm_reminder_channel"><?php _e('Reminder Channel','arm-repair-estimates'); ?></label>
+              <select id="arm_reminder_channel" name="reminder_channel">
+                <option value="email"><?php _e('Email','arm-repair-estimates'); ?></option>
+                <option value="sms"><?php _e('SMS','arm-repair-estimates'); ?></option>
+                <option value="both"><?php _e('Email & SMS','arm-repair-estimates'); ?></option>
+                <option value="none"><?php _e('Do not send reminders','arm-repair-estimates'); ?></option>
+              </select>
+            </div>
+            <div>
+              <label for="arm_reminder_lead"><?php _e('Reminder Lead Time','arm-repair-estimates'); ?></label>
+              <select id="arm_reminder_lead" name="reminder_lead_days">
+                <option value="1"><?php _e('1 day before','arm-repair-estimates'); ?></option>
+                <option value="3" selected><?php _e('3 days before','arm-repair-estimates'); ?></option>
+                <option value="7"><?php _e('7 days before','arm-repair-estimates'); ?></option>
+                <option value="14"><?php _e('14 days before','arm-repair-estimates'); ?></option>
+              </select>
+            </div>
+          </div>
+          <div class="arm-grid">
+            <div>
+              <label for="arm_reminder_hour"><?php _e('Preferred Delivery Time','arm-repair-estimates'); ?></label>
+              <select id="arm_reminder_hour" name="reminder_hour">
+                <?php for ($i = 0; $i < 24; $i++): ?>
+                  <option value="<?php echo $i; ?>" <?php selected($i, 9); ?>><?php echo esc_html(date_i18n('g A', strtotime(sprintf('%02d:00', $i)))); ?></option>
+                <?php endfor; ?>
+              </select>
+            </div>
+            <div>
+              <label for="arm_reminder_timezone"><?php _e('Time Zone','arm-repair-estimates'); ?></label>
+              <?php echo self::timezone_select('reminder_timezone'); ?>
+            </div>
+          </div>
+          <p class="description"><?php _e('We use these preferences to schedule service reminders when your vehicle is due.','arm-repair-estimates'); ?></p>
+
           <div class="arm-terms-wrap">
             <div class="arm-terms-content"><?php echo $terms; ?></div>
             <label class="arm-terms-accept"><input type="checkbox" id="arm_terms" name="terms_accepted" value="1" required> <?php _e('I accept the Terms and Conditions','arm-repair-estimates'); ?> *</label>
@@ -117,5 +154,19 @@ class Shortcode_Form {
         $sql = "SELECT DISTINCT `$col` AS v FROM `$tbl` $wsql ORDER BY v ASC";
         $results = $params ? $wpdb->get_col($wpdb->prepare($sql,$params)) : $wpdb->get_col($sql);
         wp_send_json_success(['options'=>array_values(array_filter($results))]);
+    }
+
+    private static function timezone_select(string $name, string $selected = ''): string
+    {
+        if ($selected === '') {
+            $selected = wp_timezone_string();
+        }
+
+        $field = wp_timezone_choice($selected, get_user_locale());
+        $attr  = esc_attr($name);
+        $field = preg_replace('/name="timezone_string"/', 'name="' . $attr . '"', $field, 1);
+        $field = preg_replace('/id="timezone_string"/', 'id="arm_reminder_timezone"', $field, 1);
+
+        return $field ?: '';
     }
 }

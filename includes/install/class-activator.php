@@ -24,11 +24,14 @@ final class Activator {
         
         self::require_modules();
 
-        $charset              = $wpdb->get_charset_collate();
-        $vehicles_table       = $wpdb->prefix . 'arm_vehicles';
-        $service_table        = $wpdb->prefix . 'arm_service_types';
-        $time_entries_table   = $wpdb->prefix . 'arm_time_entries';
-        $time_adjust_table    = $wpdb->prefix . 'arm_time_adjustments';
+        $charset                = $wpdb->get_charset_collate();
+        $vehicles_table         = $wpdb->prefix . 'arm_vehicles';
+        $service_table          = $wpdb->prefix . 'arm_service_types';
+        $time_entries_table     = $wpdb->prefix . 'arm_time_entries';
+        $time_adjust_table      = $wpdb->prefix . 'arm_time_adjustments';
+        $reminder_pref_table    = $wpdb->prefix . 'arm_reminder_preferences';
+        $reminder_campaigns_tbl = $wpdb->prefix . 'arm_reminder_campaigns';
+        $reminder_logs_table    = $wpdb->prefix . 'arm_reminder_logs';
 
         self::install_vehicle_schema();
 
@@ -118,6 +121,68 @@ final class Activator {
             PRIMARY KEY  (id),
             KEY idx_entry (time_entry_id),
             KEY idx_admin (admin_id)
+        ) $charset;");
+
+
+        dbDelta("CREATE TABLE $reminder_pref_table (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            customer_id BIGINT UNSIGNED NULL,
+            email VARCHAR(200) NULL,
+            phone VARCHAR(50) NULL,
+            timezone VARCHAR(64) NOT NULL DEFAULT 'UTC',
+            preferred_channel ENUM('none','email','sms','both') NOT NULL DEFAULT 'email',
+            lead_days SMALLINT UNSIGNED NOT NULL DEFAULT 3,
+            preferred_hour TINYINT UNSIGNED NOT NULL DEFAULT 9,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            source VARCHAR(64) NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY uniq_customer (customer_id),
+            UNIQUE KEY uniq_email (email),
+            KEY idx_channel (preferred_channel),
+            KEY idx_active (is_active)
+        ) $charset;");
+
+
+        dbDelta("CREATE TABLE $reminder_campaigns_tbl (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            name VARCHAR(190) NOT NULL,
+            description TEXT NULL,
+            status ENUM('draft','active','paused','archived') NOT NULL DEFAULT 'draft',
+            channel ENUM('email','sms','both') NOT NULL DEFAULT 'email',
+            frequency_unit ENUM('one_time','daily','weekly','monthly') NOT NULL DEFAULT 'one_time',
+            frequency_interval SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+            next_run_at DATETIME NULL,
+            last_run_at DATETIME NULL,
+            email_subject VARCHAR(190) NULL,
+            email_body LONGTEXT NULL,
+            sms_body TEXT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL,
+            PRIMARY KEY  (id),
+            KEY idx_status (status),
+            KEY idx_next (next_run_at)
+        ) $charset;");
+
+
+        dbDelta("CREATE TABLE $reminder_logs_table (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            campaign_id BIGINT UNSIGNED NOT NULL,
+            preference_id BIGINT UNSIGNED NOT NULL,
+            customer_id BIGINT UNSIGNED NULL,
+            channel ENUM('email','sms') NOT NULL DEFAULT 'email',
+            status ENUM('queued','pending','sent','failed','skipped') NOT NULL DEFAULT 'queued',
+            scheduled_for DATETIME NOT NULL,
+            sent_at DATETIME NULL,
+            message_body LONGTEXT NULL,
+            error_message TEXT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            KEY idx_campaign (campaign_id),
+            KEY idx_pref (preference_id),
+            KEY idx_status (status),
+            KEY idx_scheduled (scheduled_for)
         ) $charset;");
 
         
