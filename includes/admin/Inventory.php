@@ -63,7 +63,7 @@ final class Inventory
         if ($search !== '') {
             $like = '%' . $wpdb->esc_like($search) . '%';
             $by   = [];
-            foreach (['name','sku','vendor','notes'] as $k) {
+            foreach (['name','sku','location','vendor','notes'] as $k) {
                 if (!empty($cols[$k])) { $by[] = "{$cols[$k]} LIKE %s"; $params[] = $like; }
             }
             if ($by) { $where .= ' AND (' . implode(' OR ', $by) . ')'; }
@@ -72,9 +72,15 @@ final class Inventory
         $count_sql = "SELECT COUNT(*) FROM $tbl $where";
         $total = (int) $wpdb->get_var($params ? $wpdb->prepare($count_sql, ...$params) : $count_sql);
 
-        $fields = array_filter([$cols['id'] ?? 'id', $cols['name'] ?? 'name', $cols['sku'] ?? 'sku',
-                               $cols['qty'] ?? 'qty_on_hand', $cols['threshold'] ?? 'low_stock_threshold',
-                               $cols['price'] ?? 'price']);
+        $fields = array_filter([
+            $cols['id'] ?? 'id',
+            $cols['name'] ?? 'name',
+            $cols['sku'] ?? 'sku',
+            $cols['location'] ?? 'location',
+            $cols['qty'] ?? 'qty_on_hand',
+            $cols['threshold'] ?? 'low_stock_threshold',
+            $cols['price'] ?? 'price',
+        ]);
         $select = implode(',', array_map(static fn($c) => "$c AS `$c`", $fields));
 
         $list_sql = "SELECT $select FROM $tbl $where ORDER BY " . ($cols['name'] ?? 'name') . " ASC LIMIT %d OFFSET %d";
@@ -105,6 +111,7 @@ final class Inventory
                         <th><?php echo esc_html__('ID', 'arm-repair-estimates'); ?></th>
                         <th><?php echo esc_html__('Name', 'arm-repair-estimates'); ?></th>
                         <th><?php echo esc_html__('SKU', 'arm-repair-estimates'); ?></th>
+                        <th><?php echo esc_html__('Location', 'arm-repair-estimates'); ?></th>
                         <th><?php echo esc_html__('Qty', 'arm-repair-estimates'); ?></th>
                         <th><?php echo esc_html__('Threshold', 'arm-repair-estimates'); ?></th>
                         <th><?php echo esc_html__('Price', 'arm-repair-estimates'); ?></th>
@@ -118,6 +125,7 @@ final class Inventory
                               $id  = (int) ($row->{$cols['id'] ?? 'id'} ?? 0);
                               $nm  = (string) ($row->{$cols['name'] ?? 'name'} ?? '');
                               $sku = (string) ($row->{$cols['sku'] ?? 'sku'} ?? '');
+                              $loc = (string) ($row->{$cols['location'] ?? 'location'} ?? '');
                               $qty = (float)  ($row->{$cols['qty'] ?? 'qty_on_hand'} ?? 0);
                               $thr = (float)  ($row->{$cols['threshold'] ?? 'low_stock_threshold'} ?? 0);
                               $pr  = (float)  ($row->{$cols['price'] ?? 'price'} ?? 0);
@@ -127,6 +135,7 @@ final class Inventory
                                 <td>#<?php echo (int) $id; ?></td>
                                 <td><?php echo esc_html($nm); ?></td>
                                 <td><?php echo esc_html($sku); ?></td>
+                                <td><?php echo esc_html($loc); ?></td>
                                 <td><?php echo esc_html(number_format_i18n($qty)); ?></td>
                                 <td><?php echo esc_html(number_format_i18n($thr)); ?></td>
                                 <td>$<?php echo esc_html(number_format_i18n($pr, 2)); ?></td>
@@ -137,7 +146,7 @@ final class Inventory
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
-                        <tr><td colspan="7"><?php echo esc_html__('No items found.', 'arm-repair-estimates'); ?></td></tr>
+                        <tr><td colspan="8"><?php echo esc_html__('No items found.', 'arm-repair-estimates'); ?></td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
@@ -201,6 +210,10 @@ final class Inventory
                   <td><input name="sku" id="sku" type="text" class="regular-text" value="<?php echo esc_attr($row->{$cols['sku'] ?? 'sku'} ?? ''); ?>"></td>
                 </tr>
                 <tr>
+                  <th><label for="location"><?php echo esc_html__('Location', 'arm-repair-estimates'); ?></label></th>
+                  <td><input name="location" id="location" type="text" class="regular-text" value="<?php echo esc_attr($row->{$cols['location'] ?? 'location'} ?? ''); ?>"></td>
+                </tr>
+                <tr>
                   <th><label for="qty"><?php echo esc_html__('Quantity on Hand', 'arm-repair-estimates'); ?></label></th>
                   <td><input name="qty" id="qty" type="number" step="1" min="0" value="<?php echo esc_attr((string) ($row->{$cols['qty'] ?? 'qty_on_hand'} ?? '0')); ?>"></td>
                 </tr>
@@ -257,6 +270,7 @@ final class Inventory
             'name'      => sanitize_text_field($_POST['name'] ?? ''),
             'sku'       => sanitize_text_field($_POST['sku'] ?? ''),
             'vendor'    => sanitize_text_field($_POST['vendor'] ?? ''),
+            'location'  => sanitize_text_field($_POST['location'] ?? ''),
             'notes'     => wp_kses_post($_POST['notes'] ?? ''),
             'qty'       => (int) ($_POST['qty'] ?? 0),
             'threshold' => (int) ($_POST['threshold'] ?? 0),
@@ -271,6 +285,7 @@ final class Inventory
             'name'      => $cols['name'] ?? null,
             'sku'       => $cols['sku'] ?? null,
             'vendor'    => $cols['vendor'] ?? null,
+            'location'  => $cols['location'] ?? null,
             'notes'     => $cols['notes'] ?? null,
             'qty'       => $cols['qty'] ?? null,
             'threshold' => $cols['threshold'] ?? null,
@@ -351,7 +366,7 @@ final class Inventory
 
     /**
      * Schema map: resolves commonly used columns.
-     * Returns keys: id,name,sku,qty,threshold,cost,price,vendor,notes
+     * Returns keys: id,name,sku,location,qty,threshold,cost,price,vendor,notes
      */
     private static function schema_map(string $table): array
     {
@@ -375,6 +390,7 @@ final class Inventory
             'id'        => $pick(['id','item_id','inventory_id']),
             'name'      => $pick(['name','item_name','title']),
             'sku'       => $pick(['sku','item_sku','code']),
+            'location'  => $pick(['location','storage_location','bin','shelf','warehouse_location']),
             'qty'       => $pick(['qty_on_hand','quantity','stock_qty','qty']),
             'threshold' => $pick(['low_stock_threshold','reorder_level','low_threshold','threshold']),
             'cost'      => $pick(['cost','unit_cost']),
