@@ -167,6 +167,7 @@ final class Activator {
         if (class_exists('\\ARM\\Bundles\\Controller')) {
             \ARM\Bundles\Controller::install_tables();
         }
+        \ARM\Accounting\Transactions::install_tables();
         if (class_exists('\\ARM\\Integrations\\Payments_Stripe')) {
             \ARM\Integrations\Payments_Stripe::install_tables();
         }
@@ -273,6 +274,8 @@ final class Activator {
         if (class_exists('\\ARM\\Estimates\\Controller')) {
             \ARM\Estimates\Controller::install_tables();
         }
+
+        \ARM\Accounting\Transactions::install_tables();
 
         if (defined('ARM_RE_VERSION')) {
             update_option('arm_re_version', ARM_RE_VERSION);

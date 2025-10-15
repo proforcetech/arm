@@ -1,0 +1,104 @@
+<?php
+namespace ARM\Admin;
+
+use ARM\Accounting\Transactions;
+
+if (!defined('ABSPATH')) exit;
+
+class Expenses
+{
+    public static function boot() {}
+
+    public static function render(): void
+    {
+        if (!current_user_can(Transactions::capability())) {
+            wp_die(__('You do not have permission to access this screen.', 'arm-repair-estimates'));
+        }
+
+        if (!empty($_GET['export']) && $_GET['export'] === 'csv') {
+            self::export();
+        }
+
+        $message = '';
+        $message_type = 'success';
+
+        if (!empty($_POST['arm_expense_nonce']) && wp_verify_nonce($_POST['arm_expense_nonce'], 'arm_expense_save')) {
+            $data = wp_unslash($_POST);
+            $id = Transactions::save('expense', [
+                'id'               => $data['id'] ?? 0,
+                'transaction_date' => $data['transaction_date'] ?? '',
+                'category'         => $data['category'] ?? '',
+                'amount'           => $data['amount'] ?? 0,
+                'reference'        => $data['reference'] ?? '',
+                'description'      => $data['description'] ?? '',
+                'vendor_name'      => $data['vendor_name'] ?? '',
+            ]);
+
+            if ($id) {
+                $message = __('Expense saved.', 'arm-repair-estimates');
+                $message_type = 'success';
+            } else {
+                $message = __('Unable to save expense.', 'arm-repair-estimates');
+                $message_type = 'error';
+            }
+        }
+
+        if (!empty($_GET['delete']) && !empty($_GET['_wpnonce']) && wp_verify_nonce($_GET['_wpnonce'], 'arm_expense_delete')) {
+            $deleted = Transactions::delete('expense', (int) $_GET['delete']);
+            if ($deleted) {
+                $message = __('Expense deleted.', 'arm-repair-estimates');
+                $message_type = 'success';
+            } else {
+                $message = __('Unable to delete expense.', 'arm-repair-estimates');
+                $message_type = 'error';
+            }
+        }
+
+        $edit = null;
+        if (!empty($_GET['edit'])) {
+            $edit = Transactions::get('expense', (int) $_GET['edit']);
+        }
+
+        $filters = [
+            'from'     => isset($_GET['from']) ? sanitize_text_field(wp_unslash($_GET['from'])) : '',
+            'to'       => isset($_GET['to']) ? sanitize_text_field(wp_unslash($_GET['to'])) : '',
+            'category' => isset($_GET['category']) ? sanitize_text_field(wp_unslash($_GET['category'])) : '',
+            'number'   => 100,
+        ];
+
+        $rows = Transactions::query('expense', array_filter($filters));
+
+        include ARM_RE_PATH . 'templates/admin/accounting-expenses.php';
+    }
+
+    private static function export(): void
+    {
+        $filters = [
+            'from'     => isset($_GET['from']) ? sanitize_text_field(wp_unslash($_GET['from'])) : '',
+            'to'       => isset($_GET['to']) ? sanitize_text_field(wp_unslash($_GET['to'])) : '',
+            'category' => isset($_GET['category']) ? sanitize_text_field(wp_unslash($_GET['category'])) : '',
+        ];
+
+        $rows = Transactions::query('expense', array_filter($filters));
+
+        nocache_headers();
+        header('Content-Type: text/csv');
+        header('Content-Disposition: attachment; filename="expenses-export-' . gmdate('Ymd-His') . '.csv"');
+
+        $output = fopen('php://output', 'w');
+        fputcsv($output, ['ID', 'Date', 'Vendor', 'Category', 'Amount', 'Reference', 'Description']);
+        foreach ($rows as $row) {
+            fputcsv($output, [
+                $row['id'],
+                $row['transaction_date'],
+                $row['vendor_name'] ?? '',
+                $row['category'],
+                number_format((float) $row['amount'], 2, '.', ''),
+                $row['reference'],
+                wp_strip_all_tags($row['description']),
+            ]);
+        }
+        fclose($output);
+        exit;
+    }
+}

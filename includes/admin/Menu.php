@@ -1,6 +1,8 @@
 <?php
 namespace ARM\Admin;
 
+use ARM\Accounting\Transactions;
+
 if (!defined('ABSPATH')) exit;
 
 class Menu
@@ -12,6 +14,8 @@ class Menu
 
     public static function register(): void
     {
+        $accounting_cap = Transactions::capability();
+
         add_menu_page(
             __('Repair Estimates', 'arm-repair-estimates'),
             __('Repair Estimates', 'arm-repair-estimates'),
@@ -38,6 +42,42 @@ class Menu
             'manage_options',
             'arm-repair-services',
             [Services::class, 'render']
+        );
+
+        add_submenu_page(
+            'arm-repair-estimates',
+            __('Income', 'arm-repair-estimates'),
+            __('Income', 'arm-repair-estimates'),
+            $accounting_cap,
+            'arm-accounting-income',
+            [Income::class, 'render']
+        );
+
+        add_submenu_page(
+            'arm-repair-estimates',
+            __('Expenses', 'arm-repair-estimates'),
+            __('Expenses', 'arm-repair-estimates'),
+            $accounting_cap,
+            'arm-accounting-expenses',
+            [Expenses::class, 'render']
+        );
+
+        add_submenu_page(
+            'arm-repair-estimates',
+            __('Purchases', 'arm-repair-estimates'),
+            __('Purchases', 'arm-repair-estimates'),
+            $accounting_cap,
+            'arm-accounting-purchases',
+            [Purchases::class, 'render']
+        );
+
+        add_submenu_page(
+            'arm-repair-estimates',
+            __('Financial Reports', 'arm-repair-estimates'),
+            __('Financial Reports', 'arm-repair-estimates'),
+            $accounting_cap,
+            'arm-accounting-reports',
+            [FinancialReports::class, 'render']
         );
 
         add_submenu_page(
