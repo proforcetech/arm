@@ -32,6 +32,7 @@ final class Activator {
         $reminder_pref_table    = $wpdb->prefix . 'arm_reminder_preferences';
         $reminder_campaigns_tbl = $wpdb->prefix . 'arm_reminder_campaigns';
         $reminder_logs_table    = $wpdb->prefix . 'arm_reminder_logs';
+        $inventory_table        = $wpdb->prefix . 'arm_inventory';
 
         self::install_vehicle_schema();
 
@@ -121,6 +122,29 @@ final class Activator {
             PRIMARY KEY  (id),
             KEY idx_entry (time_entry_id),
             KEY idx_admin (admin_id)
+        ) $charset;");
+
+
+        dbDelta("CREATE TABLE $inventory_table (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            name VARCHAR(190) NOT NULL,
+            sku VARCHAR(190) NULL,
+            location VARCHAR(190) NULL,
+            qty_on_hand INT NOT NULL DEFAULT 0,
+            low_stock_threshold INT NOT NULL DEFAULT 0,
+            reorder_quantity INT NOT NULL DEFAULT 0,
+            cost DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+            price DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+            vendor VARCHAR(190) NULL,
+            notes TEXT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL,
+            PRIMARY KEY  (id),
+            KEY sku (sku),
+            KEY location (location),
+            KEY vendor (vendor),
+            KEY qty (qty_on_hand),
+            KEY threshold (low_stock_threshold)
         ) $charset;");
 
 
