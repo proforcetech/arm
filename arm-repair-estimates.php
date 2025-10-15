@@ -25,6 +25,10 @@ add_action('plugins_loaded', function () {
     ARM\Admin\Customers::boot();
     ARM\Admin\Settings::boot();
     ARM\Admin\Services::boot();
+    ARM\Admin\Income::boot();
+    ARM\Admin\Expenses::boot();
+    ARM\Admin\Purchases::boot();
+    ARM\Admin\FinancialReports::boot();
     ARM\Admin\Vehicles::boot();
     ARM\Admin\WarrantyClaims::boot();
     ARM\Customer\WarrantyClaims::boot();
