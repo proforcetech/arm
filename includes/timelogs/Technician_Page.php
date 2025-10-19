@@ -51,10 +51,23 @@ final class Technician_Page
             wp_die(__('You do not have permission to view this page.', 'arm-repair-estimates'));
         }
 
-        $jobs          = Controller::get_jobs_for_technician($user->ID);
-        $assigned_rows = [];
+        echo self::render_portal($user, true);
+    }
+
+    public static function render_portal(WP_User $user, bool $is_admin = true): string
+    {
+        $context = self::build_context($user);
+        self::enqueue_assets($context);
+
+        return self::render_view($context, $is_admin);
+    }
+
+    private static function build_context(WP_User $user): array
+    {
+        $jobs           = Controller::get_jobs_for_technician((int) $user->ID);
+        $assigned_rows  = [];
         $completed_rows = [];
-        $active_job_id = 0;
+        $active_job_id  = 0;
 
         foreach ($jobs as $job) {
             $totals = Controller::get_job_totals((int) $job['job_id'], (int) $user->ID);
@@ -77,6 +90,19 @@ final class Technician_Page
         $summary['assigned_count']  = count($assigned_rows);
         $summary['completed_count'] = count($completed_rows);
 
+        return [
+            'assigned_rows'  => $assigned_rows,
+            'completed_rows' => $completed_rows,
+            'summary'        => $summary,
+            'active_job_id'  => $active_job_id,
+        ];
+    }
+
+    private static function enqueue_assets(array $context): void
+    {
+        $summary      = $context['summary'] ?? [];
+        $active_job_id = isset($context['active_job_id']) ? (int) $context['active_job_id'] : 0;
+
         $nonce = wp_create_nonce('wp_rest');
         $rest  = [
             'start' => rest_url('arm/v1/time-entries/start'),
@@ -89,23 +115,43 @@ final class Technician_Page
             'activeJobId' => $active_job_id,
             'summary'     => $summary,
             'i18n'        => [
-                'startError'         => __('Unable to start the timer. Please try again.', 'arm-repair-estimates'),
-                'stopError'          => __('Unable to stop the timer. Please try again.', 'arm-repair-estimates'),
-                'started'            => __('Timer started.', 'arm-repair-estimates'),
-                'stopped'            => __('Timer stopped.', 'arm-repair-estimates'),
-                'runningSince'       => __('Running since %s', 'arm-repair-estimates'),
-                'decimalLabel'       => __('Decimal: %s hrs', 'arm-repair-estimates'),
-                'locationDenied'     => __('Location access was denied. Time will still be tracked, but location could not be saved.', 'arm-repair-estimates'),
-                'locationUnavailable'=> __('We were unable to capture your location. Time entries will continue without it.', 'arm-repair-estimates'),
+                'startError'          => __('Unable to start the timer. Please try again.', 'arm-repair-estimates'),
+                'stopError'           => __('Unable to stop the timer. Please try again.', 'arm-repair-estimates'),
+                'started'             => __('Timer started.', 'arm-repair-estimates'),
+                'stopped'             => __('Timer stopped.', 'arm-repair-estimates'),
+                'runningSince'        => __('Running since %s', 'arm-repair-estimates'),
+                'decimalLabel'        => __('Decimal: %s hrs', 'arm-repair-estimates'),
+                'locationDenied'      => __('Location access was denied. Time will still be tracked, but location could not be saved.', 'arm-repair-estimates'),
+                'locationUnavailable' => __('We were unable to capture your location. Time entries will continue without it.', 'arm-repair-estimates'),
             ],
         ]);
 
         wp_enqueue_style('arm-re-admin');
         wp_enqueue_script('arm-tech-time');
+    }
 
+    private static function render_view(array $context, bool $is_admin): string
+    {
+        $assigned_rows  = $context['assigned_rows'] ?? [];
+        $completed_rows = $context['completed_rows'] ?? [];
+        $summary        = $context['summary'] ?? [];
+        $active_job_id  = isset($context['active_job_id']) ? (int) $context['active_job_id'] : 0;
+
+        $wrapper_classes = ['arm-tech-time'];
+        if ($is_admin) {
+            array_unshift($wrapper_classes, 'wrap');
+        } else {
+            $wrapper_classes[] = 'arm-tech-time--shortcode';
+        }
+
+        ob_start();
         ?>
-        <div class="wrap arm-tech-time">
-            <h1><?php esc_html_e('Technician Portal', 'arm-repair-estimates'); ?></h1>
+        <div class="<?php echo esc_attr(implode(' ', $wrapper_classes)); ?>">
+            <?php if ($is_admin) : ?>
+                <h1><?php esc_html_e('Technician Portal', 'arm-repair-estimates'); ?></h1>
+            <?php else : ?>
+                <h2 class="arm-tech-time__title"><?php esc_html_e('Technician Portal', 'arm-repair-estimates'); ?></h2>
+            <?php endif; ?>
             <p class="description"><?php esc_html_e('Review your assigned work orders, log time for active jobs, and monitor your billable hours.', 'arm-repair-estimates'); ?></p>
 
             <div id="arm-tech-time__notice" class="notice" style="display:none;"></div>
@@ -113,20 +159,20 @@ final class Technician_Page
             <div class="arm-tech-time__summary" id="arm-tech-time__summary">
                 <div class="arm-tech-time__summary-card" data-summary="work">
                     <span class="arm-tech-time__summary-label"><?php esc_html_e('Total Hours Worked', 'arm-repair-estimates'); ?></span>
-                    <span class="arm-tech-time__summary-value" data-summary-field="value"><?php echo esc_html($summary['work_formatted']); ?></span>
-                    <span class="arm-tech-time__summary-subtext" data-summary-field="decimal"><?php echo esc_html(sprintf(__('Decimal: %s hrs', 'arm-repair-estimates'), $summary['work_decimal_formatted'])); ?></span>
+                    <span class="arm-tech-time__summary-value" data-summary-field="value"><?php echo esc_html($summary['work_formatted'] ?? '0:00'); ?></span>
+                    <span class="arm-tech-time__summary-subtext" data-summary-field="decimal"><?php echo esc_html(sprintf(__('Decimal: %s hrs', 'arm-repair-estimates'), $summary['work_decimal_formatted'] ?? '0.0')); ?></span>
                 </div>
                 <div class="arm-tech-time__summary-card" data-summary="billable">
                     <span class="arm-tech-time__summary-label"><?php esc_html_e('Billable Hours', 'arm-repair-estimates'); ?></span>
-                    <span class="arm-tech-time__summary-value" data-summary-field="value"><?php echo esc_html($summary['billable_formatted']); ?></span>
+                    <span class="arm-tech-time__summary-value" data-summary-field="value"><?php echo esc_html($summary['billable_formatted'] ?? '0:00'); ?></span>
                 </div>
                 <div class="arm-tech-time__summary-card" data-summary="assigned">
                     <span class="arm-tech-time__summary-label"><?php esc_html_e('Assigned Work Orders', 'arm-repair-estimates'); ?></span>
-                    <span class="arm-tech-time__summary-value" data-summary-field="value"><?php echo esc_html(number_format_i18n(count($assigned_rows))); ?></span>
+                    <span class="arm-tech-time__summary-value" data-summary-field="value"><?php echo esc_html(number_format_i18n((int) ($summary['assigned_count'] ?? 0))); ?></span>
                 </div>
                 <div class="arm-tech-time__summary-card" data-summary="completed">
                     <span class="arm-tech-time__summary-label"><?php esc_html_e('Completed Work Orders', 'arm-repair-estimates'); ?></span>
-                    <span class="arm-tech-time__summary-value" data-summary-field="value"><?php echo esc_html(number_format_i18n(count($completed_rows))); ?></span>
+                    <span class="arm-tech-time__summary-value" data-summary-field="value"><?php echo esc_html(number_format_i18n((int) ($summary['completed_count'] ?? 0))); ?></span>
                 </div>
             </div>
 
@@ -230,6 +276,7 @@ final class Technician_Page
             <?php endif; ?>
         </div>
         <?php
+        return (string) ob_get_clean();
     }
 
     private static function format_status_label(?string $status): string
@@ -258,7 +305,7 @@ final class Technician_Page
         return in_array($normalized, $completed, true);
     }
 
-    private static function is_visible_to(WP_User $user): bool
+    public static function is_visible_to(WP_User $user): bool
     {
         if (user_can($user, 'manage_options')) {
             return true;
