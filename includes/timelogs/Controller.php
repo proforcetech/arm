@@ -12,6 +12,7 @@ final class Controller
     {
         Rest::boot();
         Technician_Page::boot();
+        Shortcode::boot();
         Admin::boot();
         Assets::boot();
     }

@@ -8,6 +8,7 @@ final class Assets
     public static function boot(): void
     {
         add_action('admin_enqueue_scripts', [__CLASS__, 'register']);
+        add_action('wp_enqueue_scripts', [__CLASS__, 'register']);
     }
 
     public static function register(): void
