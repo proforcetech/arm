@@ -162,7 +162,10 @@ final class Admin
                 <tbody>
                     <?php if (empty($entries)) : ?>
                         <tr><td colspan="8"><?php esc_html_e('No time entries found for the selected range.', 'arm-repair-estimates'); ?></td></tr>
-                    <?php else : foreach ($entries as $entry) : ?>
+                    <?php else : foreach ($entries as $entry) :
+                        $start_location = Controller::decode_location_value($entry['start_location'] ?? null);
+                        $end_location   = Controller::decode_location_value($entry['end_location'] ?? null);
+                    ?>
                         <tr>
                             <td>#<?php echo esc_html($entry['id']); ?></td>
                             <td><?php echo esc_html($entry['technician_name'] ?: __('Unknown', 'arm-repair-estimates')); ?></td>
@@ -173,7 +176,21 @@ final class Admin
                             <td><?php echo esc_html(self::format_admin_datetime($entry['start_at'])); ?></td>
                             <td><?php echo $entry['end_at'] ? esc_html(self::format_admin_datetime($entry['end_at'])) : '&mdash;'; ?></td>
                             <td><?php echo esc_html(self::format_duration_display($entry)); ?></td>
-                            <td><?php echo $entry['notes'] ? esc_html($entry['notes']) : '&mdash;'; ?></td>
+                            <td>
+                                <?php echo $entry['notes'] ? esc_html($entry['notes']) : '&mdash;'; ?>
+                                <?php if ($start_location) : ?>
+                                    <span class="arm-time-logs__location"><?php printf(
+                                        esc_html__('Start: %s', 'arm-repair-estimates'),
+                                        esc_html(self::format_location_excerpt($start_location))
+                                    ); ?></span>
+                                <?php endif; ?>
+                                <?php if ($end_location) : ?>
+                                    <span class="arm-time-logs__location"><?php printf(
+                                        esc_html__('End: %s', 'arm-repair-estimates'),
+                                        esc_html(self::format_location_excerpt($end_location))
+                                    ); ?></span>
+                                <?php endif; ?>
+                            </td>
                             <td><a class="button" href="<?php echo esc_url(add_query_arg(['page' => self::MENU_SLUG, 'entry' => (int) $entry['id'], 'start' => $start_filter, 'end' => $end_filter], admin_url('admin.php'))); ?>"><?php esc_html_e('Edit', 'arm-repair-estimates'); ?></a></td>
                         </tr>
                     <?php endforeach; endif; ?>
@@ -467,6 +484,43 @@ final class Admin
             return '';
         }
         return $dt->format('Y-m-d\TH:i');
+    }
+
+    private static function format_location_excerpt(?array $location): string
+    {
+        if (!$location) {
+            return '';
+        }
+
+        $parts = [];
+
+        if (isset($location['latitude']) && isset($location['longitude'])) {
+            $parts[] = sprintf(
+                __('Lat: %1$.5f, Lng: %2$.5f', 'arm-repair-estimates'),
+                (float) $location['latitude'],
+                (float) $location['longitude']
+            );
+        }
+
+        if (!empty($location['recorded_at'])) {
+            $timestamp = strtotime($location['recorded_at']);
+            if ($timestamp) {
+                $parts[] = sprintf(
+                    __('Recorded: %s', 'arm-repair-estimates'),
+                    date_i18n(get_option('date_format') . ' ' . get_option('time_format'), $timestamp)
+                );
+            }
+        }
+
+        if (!empty($location['error'])) {
+            $parts[] = sprintf(__('Error: %s', 'arm-repair-estimates'), $location['error']);
+        }
+
+        if (!empty($location['message'])) {
+            $parts[] = $location['message'];
+        }
+
+        return implode(' | ', $parts);
     }
 
     private static function format_admin_datetime(?string $value): string
