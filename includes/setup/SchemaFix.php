@@ -11,6 +11,7 @@ class SchemaFix {
 
         $estimates_table = $wpdb->prefix . 'arm_estimates';
         $jobs_table      = $wpdb->prefix . 'arm_estimate_jobs';
+        $time_entries    = $wpdb->prefix . 'arm_time_entries';
         self::addColumn($estimates_table, 'vehicle_id', 'BIGINT UNSIGNED NULL');
         self::addColumn($estimates_table, 'vehicle_year', 'SMALLINT UNSIGNED NULL');
         self::addColumn($estimates_table, 'vehicle_make', 'VARCHAR(80) NULL');
@@ -21,6 +22,9 @@ class SchemaFix {
         self::addColumn($estimates_table, 'vehicle_trim', 'VARCHAR(120) NULL');
         self::addColumn($estimates_table, 'technician_id', 'BIGINT UNSIGNED NULL');
         self::addColumn($jobs_table, 'technician_id', 'BIGINT UNSIGNED NULL');
+
+        self::addColumn($time_entries, 'start_location', 'LONGTEXT NULL');
+        self::addColumn($time_entries, 'end_location', 'LONGTEXT NULL');
 
         self::ensurePrimaryKey($wpdb->prefix . 'arm_customers', 'id');
         self::ensurePrimaryKey($wpdb->prefix . 'arm_appointments', 'id');

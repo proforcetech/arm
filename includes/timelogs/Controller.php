@@ -39,6 +39,8 @@ final class Controller
             end_at DATETIME NULL,
             duration_minutes INT UNSIGNED NULL,
             notes TEXT NULL,
+            start_location LONGTEXT NULL,
+            end_location LONGTEXT NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NULL,
             PRIMARY KEY  (id),
@@ -80,7 +82,147 @@ final class Controller
         return $wpdb->prefix . 'arm_time_adjustments';
     }
 
-    public static function start_entry(int $job_id, int $user_id, string $source = 'technician', string $note = '')
+    private static function encode_location($location): ?string
+    {
+        $normalized = self::normalize_location($location);
+        if ($normalized === null) {
+            return null;
+        }
+
+        $json = wp_json_encode($normalized);
+        return is_string($json) ? $json : null;
+    }
+
+    private static function normalize_location($location): ?array
+    {
+        if ($location instanceof \stdClass) {
+            $location = (array) $location;
+        }
+
+        if (is_string($location)) {
+            $decoded = json_decode($location, true);
+            if (!is_array($decoded)) {
+                return null;
+            }
+            $location = $decoded;
+        }
+
+        if (!is_array($location)) {
+            return null;
+        }
+
+        $normalized = [];
+        $numeric_fields = [
+            'latitude',
+            'longitude',
+            'accuracy',
+            'altitude',
+            'altitudeAccuracy',
+            'heading',
+            'speed',
+        ];
+
+        foreach ($numeric_fields as $field) {
+            if (isset($location[$field]) && is_numeric($location[$field])) {
+                $normalized[$field] = (float) $location[$field];
+            }
+        }
+
+        $timestamp = null;
+        if (!empty($location['recorded_at'])) {
+            $timestamp = strtotime((string) $location['recorded_at']);
+        } elseif (!empty($location['timestamp'])) {
+            if (is_numeric($location['timestamp'])) {
+                $raw = (float) $location['timestamp'];
+                if ($raw > 0) {
+                    if ($raw > 9999999999) {
+                        $raw = $raw / 1000;
+                    }
+                    $timestamp = (int) round($raw);
+                }
+            } else {
+                $timestamp = strtotime((string) $location['timestamp']);
+            }
+        }
+
+        if ($timestamp) {
+            $normalized['recorded_at'] = gmdate('Y-m-d\TH:i:s\Z', $timestamp);
+        }
+
+        if (isset($location['error'])) {
+            $error = strtoupper(preg_replace('/[^A-Z0-9_:-]/', '', (string) $location['error']));
+            if ($error !== '') {
+                $normalized['error'] = $error;
+            }
+        }
+
+        if (!empty($location['message'])) {
+            $message = self::sanitize_location_message($location['message']);
+            if ($message !== '') {
+                $normalized['message'] = $message;
+            }
+        }
+
+        if (!empty($location['source'])) {
+            $source = sanitize_key((string) $location['source']);
+            if ($source !== '') {
+                $normalized['source'] = $source;
+            }
+        }
+
+        if ($normalized && !isset($normalized['recorded_at'])) {
+            $normalized['recorded_at'] = gmdate('Y-m-d\TH:i:s\Z', current_time('timestamp', true));
+        }
+
+        return $normalized ?: null;
+    }
+
+    private static function sanitize_location_message($message): string
+    {
+        $message = is_scalar($message) ? (string) $message : '';
+        if ($message === '') {
+            return '';
+        }
+
+        if (function_exists('sanitize_textarea_field')) {
+            $message = sanitize_textarea_field($message);
+        } else {
+            $message = sanitize_text_field($message);
+        }
+
+        if ($message === '') {
+            return '';
+        }
+
+        if (function_exists('mb_substr')) {
+            $message = mb_substr($message, 0, 500);
+        } else {
+            $message = substr($message, 0, 500);
+        }
+
+        return $message;
+    }
+
+    private static function decode_location($value): ?array
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (is_array($value)) {
+            return $value;
+        }
+
+        $decoded = json_decode((string) $value, true);
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    public static function decode_location_value($value): ?array
+    {
+        return self::decode_location($value);
+    }
+
+    public static function start_entry(int $job_id, int $user_id, string $source = 'technician', string $note = '', array $location = [])
     {
         global $wpdb;
         if (!$wpdb instanceof wpdb) {
@@ -96,6 +238,15 @@ final class Controller
             return new WP_Error('arm_time_forbidden', __('You are not allowed to log time for this job.', 'arm-repair-estimates'), ['status' => 403]);
         }
 
+        $existing_open = self::get_user_open_entry($user_id);
+        if ($existing_open && (int) $existing_open['job_id'] !== $job_id) {
+            return new WP_Error(
+                'arm_time_active_job',
+                __('You are currently tracking time on another job. Please stop it before starting a new one.', 'arm-repair-estimates'),
+                ['status' => 409]
+            );
+        }
+
         $open_entry = self::get_open_entry($job_id, $user_id);
         if ($open_entry) {
             return new WP_Error('arm_time_already_open', __('A time entry is already running for this job.', 'arm-repair-estimates'), ['status' => 409]);
@@ -105,6 +256,9 @@ final class Controller
         if (function_exists('sanitize_textarea_field')) {
             $note = sanitize_textarea_field($note);
         }
+
+        $start_location = self::encode_location($location);
+
         $data = [
             'job_id'        => $job_id,
             'estimate_id'   => (int) $job->estimate_id,
@@ -116,6 +270,12 @@ final class Controller
         ];
 
         $formats = ['%d','%d','%d','%s','%s','%s','%s'];
+
+        if ($start_location !== null) {
+            $data['start_location'] = $start_location;
+            $formats[] = '%s';
+        }
+
         if (!$wpdb->insert(self::table_entries(), $data, $formats)) {
             return new WP_Error('arm_time_insert_failed', __('Unable to start time entry.', 'arm-repair-estimates'));
         }
@@ -131,20 +291,21 @@ final class Controller
         return [
             'entry'  => $entry,
             'totals' => self::get_job_totals($job_id, $user_id),
+            'summary'=> self::get_technician_summary($user_id),
         ];
     }
 
-    public static function end_entry_by_job(int $job_id, int $user_id)
+    public static function end_entry_by_job(int $job_id, int $user_id, array $location = [])
     {
         $entry = self::get_open_entry($job_id, $user_id);
         if (!$entry) {
             return new WP_Error('arm_time_not_running', __('No running time entry found for this job.', 'arm-repair-estimates'), ['status' => 404]);
         }
 
-        return self::close_entry((int) $entry['id'], $user_id);
+        return self::close_entry((int) $entry['id'], $user_id, false, $location);
     }
 
-    public static function close_entry(int $entry_id, int $user_id, bool $force = false)
+    public static function close_entry(int $entry_id, int $user_id, bool $force = false, array $location = [])
     {
         global $wpdb;
         if (!$wpdb instanceof wpdb) {
@@ -169,15 +330,25 @@ final class Controller
         $end_ts    = max($start_ts, current_time('timestamp'));
         $duration  = max(1, (int) floor(($end_ts - $start_ts) / 60));
 
+        $end_location = self::encode_location($location);
+
+        $update_data = [
+            'end_at'          => $now,
+            'duration_minutes'=> $duration,
+            'updated_at'      => $now,
+        ];
+        $update_formats = ['%s','%d','%s'];
+
+        if ($end_location !== null) {
+            $update_data['end_location'] = $end_location;
+            $update_formats[] = '%s';
+        }
+
         $updated = $wpdb->update(
             self::table_entries(),
-            [
-                'end_at'          => $now,
-                'duration_minutes'=> $duration,
-                'updated_at'      => $now,
-            ],
+            $update_data,
             ['id' => $entry_id],
-            ['%s','%d','%s'],
+            $update_formats,
             ['%d']
         );
 
@@ -195,6 +366,7 @@ final class Controller
         return [
             'entry'  => $entry,
             'totals' => self::get_job_totals((int) $entry['job_id'], (int) $entry['technician_id']),
+            'summary'=> self::get_technician_summary((int) $entry['technician_id']),
         ];
     }
 
@@ -408,6 +580,143 @@ final class Controller
         ];
     }
 
+    public static function get_open_entries_for_user(int $user_id): array
+    {
+        global $wpdb;
+        if (!$wpdb instanceof wpdb) {
+            return [];
+        }
+
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                'SELECT * FROM ' . self::table_entries() . ' WHERE technician_id = %d AND end_at IS NULL ORDER BY start_at ASC',
+                $user_id
+            ),
+            ARRAY_A
+        );
+
+        if (!$rows) {
+            return [];
+        }
+
+        return array_map([__CLASS__, 'format_entry'], $rows);
+    }
+
+    public static function get_user_open_entry(int $user_id): ?array
+    {
+        $entries = self::get_open_entries_for_user($user_id);
+        return $entries[0] ?? null;
+    }
+
+    public static function get_total_minutes_for_technician(int $user_id): int
+    {
+        global $wpdb;
+        if (!$wpdb instanceof wpdb) {
+            return 0;
+        }
+
+        $minutes = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                'SELECT COALESCE(SUM(duration_minutes),0) FROM ' . self::table_entries() . ' WHERE technician_id = %d AND duration_minutes IS NOT NULL',
+                $user_id
+            )
+        );
+
+        $open_entries = self::get_open_entries_for_user($user_id);
+        foreach ($open_entries as $entry) {
+            $minutes += (int) ($entry['elapsed_minutes'] ?? 0);
+        }
+
+        return $minutes;
+    }
+
+    private static function get_invoice_hours_column(): string
+    {
+        static $column = null;
+
+        if ($column !== null) {
+            return $column;
+        }
+
+        global $wpdb;
+        $column = 'qty';
+        if (!$wpdb instanceof wpdb) {
+            return $column;
+        }
+
+        $table = $wpdb->prefix . 'arm_invoice_items';
+
+        $qty_exists = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = 'qty' LIMIT 1",
+                $table
+            )
+        );
+
+        if ($qty_exists) {
+            $column = 'qty';
+            return $column;
+        }
+
+        $hours_exists = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = 'hours' LIMIT 1",
+                $table
+            )
+        );
+
+        if ($hours_exists) {
+            $column = 'hours';
+        }
+
+        return $column;
+    }
+
+    public static function get_billable_hours_for_technician(int $user_id): float
+    {
+        global $wpdb;
+        if (!$wpdb instanceof wpdb) {
+            return 0.0;
+        }
+
+        $invoice_items = $wpdb->prefix . 'arm_invoice_items';
+        $invoices      = $wpdb->prefix . 'arm_invoices';
+        $estimates     = $wpdb->prefix . 'arm_estimates';
+        $column        = self::get_invoice_hours_column();
+
+        $sql = "SELECT COALESCE(SUM(ii.$column), 0)
+                FROM $invoice_items ii
+                INNER JOIN $invoices i ON i.id = ii.invoice_id
+                INNER JOIN $estimates e ON e.id = i.estimate_id
+                WHERE ii.item_type = %s
+                  AND e.technician_id = %d
+                  AND (i.status IS NULL OR i.status <> %s)";
+
+        $value = $wpdb->get_var($wpdb->prepare($sql, 'LABOR', $user_id, 'VOID'));
+
+        if ($value === null) {
+            return 0.0;
+        }
+
+        return (float) $value;
+    }
+
+    public static function get_technician_summary(int $user_id): array
+    {
+        $minutes  = self::get_total_minutes_for_technician($user_id);
+        $billable = self::get_billable_hours_for_technician($user_id);
+        $decimal  = $minutes / 60;
+
+        return [
+            'work_minutes'           => $minutes,
+            'work_formatted'         => self::format_minutes($minutes),
+            'work_decimal'           => $decimal,
+            'work_decimal_formatted' => number_format((float) $decimal, 2, '.', ''),
+            'billable_hours'         => $billable,
+            'billable_formatted'     => number_format((float) $billable, 2, '.', ''),
+        ];
+    }
+
     public static function format_minutes(int $minutes): string
     {
         $hours = (int) floor($minutes / 60);
@@ -509,6 +818,19 @@ final class Controller
 
     public static function format_entry(array $row): array
     {
+        if (array_key_exists('id', $row)) {
+            $row['id'] = (int) $row['id'];
+        }
+        if (array_key_exists('job_id', $row)) {
+            $row['job_id'] = (int) $row['job_id'];
+        }
+        if (array_key_exists('estimate_id', $row)) {
+            $row['estimate_id'] = (int) $row['estimate_id'];
+        }
+        if (array_key_exists('technician_id', $row)) {
+            $row['technician_id'] = (int) $row['technician_id'];
+        }
+
         $is_open = empty($row['end_at']);
         $elapsed = 0;
         if ($is_open && !empty($row['start_at'])) {
@@ -518,6 +840,14 @@ final class Controller
 
         if (array_key_exists('duration_minutes', $row) && $row['duration_minutes'] !== null) {
             $row['duration_minutes'] = (int) $row['duration_minutes'];
+        }
+
+        if (array_key_exists('start_location', $row)) {
+            $row['start_location'] = self::decode_location($row['start_location']);
+        }
+
+        if (array_key_exists('end_location', $row)) {
+            $row['end_location'] = self::decode_location($row['end_location']);
         }
 
         $row['is_open']         = $is_open;

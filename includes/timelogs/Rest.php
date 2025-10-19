@@ -63,7 +63,15 @@ final class Rest
         $note   = trim((string) $request->get_param('note'));
         $user_id = get_current_user_id();
 
-        $result = Controller::start_entry($job_id, $user_id, 'technician', $note);
+        $location = $request->get_param('location');
+        if ($location instanceof \stdClass) {
+            $location = (array) $location;
+        }
+        if (!is_array($location)) {
+            $location = [];
+        }
+
+        $result = Controller::start_entry($job_id, $user_id, 'technician', $note, $location);
         if ($result instanceof WP_Error) {
             return self::error_response($result);
         }
@@ -77,10 +85,18 @@ final class Rest
         $job_id   = (int) $request->get_param('job_id');
         $user_id  = get_current_user_id();
 
+        $location = $request->get_param('location');
+        if ($location instanceof \stdClass) {
+            $location = (array) $location;
+        }
+        if (!is_array($location)) {
+            $location = [];
+        }
+
         if ($entry_id > 0) {
-            $result = Controller::close_entry($entry_id, $user_id);
+            $result = Controller::close_entry($entry_id, $user_id, false, $location);
         } elseif ($job_id > 0) {
-            $result = Controller::end_entry_by_job($job_id, $user_id);
+            $result = Controller::end_entry_by_job($job_id, $user_id, $location);
         } else {
             return self::error_response(new WP_Error('arm_time_missing_params', __('Missing entry or job reference.', 'arm-repair-estimates'), ['status' => 400]));
         }

@@ -96,6 +96,8 @@ final class Activator {
             end_at DATETIME NULL,
             duration_minutes INT UNSIGNED NULL,
             notes TEXT NULL,
+            start_location LONGTEXT NULL,
+            end_location LONGTEXT NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NULL,
             PRIMARY KEY  (id),

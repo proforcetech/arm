@@ -17,3 +17,58 @@
 .arm-ok { background: #e7f7eb; color: #1f7a36; border: 1px solid #b9e0c3; }
 .arm-error { background: #fde8e8; color: #9b1c1c; border: 1px solid #f5c2c2; }
 .arm-sms-consent { margin-top: 6px; color: #555; }
+
+.arm-tech-time__summary {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin: 20px 0;
+}
+
+.arm-tech-time__summary-card {
+  background: #fff;
+  border: 1px solid #dcdcde;
+  border-radius: 6px;
+  padding: 16px;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.arm-tech-time__summary-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #50575e;
+  margin-bottom: 6px;
+}
+
+.arm-tech-time__summary-value {
+  display: block;
+  font-size: 22px;
+  font-weight: 600;
+  color: #1d2327;
+}
+
+.arm-tech-time__summary-subtext {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #646970;
+}
+
+.arm-tech-time__buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.arm-tech-time__completed-table td {
+  vertical-align: top;
+}
+
+.arm-time-logs__location {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #646970;
+}
