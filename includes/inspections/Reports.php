@@ -8,7 +8,7 @@ class Reports
     public static function boot(): void
     {
         add_action('admin_post_arm_re_submit_inspection', [__CLASS__, 'handle_submission']);
-        add_action('admin_post_nopriv_arm_re_submit_inspection', [__CLASS__, 'handle_submission']);
+        // Removed nopriv hook - only logged-in users with proper roles can submit
     }
 
     public static function create(array $template, array $submission, array $responses): int
@@ -246,6 +246,30 @@ class Reports
     {
         if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], 'arm_re_submit_inspection')) {
             wp_die(__('Security check failed', 'arm-repair-estimates'));
+        }
+
+        // Check if user is logged in
+        if (!is_user_logged_in()) {
+            wp_die(__('You must be logged in to submit an inspection form.', 'arm-repair-estimates'));
+        }
+
+        // Check if user has required role (admin or technician)
+        $current_user = wp_get_current_user();
+        $has_permission = false;
+
+        // Admins always have access
+        if (user_can($current_user, 'manage_options')) {
+            $has_permission = true;
+        } else {
+            // Check for technician roles
+            $roles = (array) $current_user->roles;
+            if (in_array('arm_technician', $roles, true) || in_array('technician', $roles, true)) {
+                $has_permission = true;
+            }
+        }
+
+        if (!$has_permission) {
+            wp_die(__('You do not have permission to submit inspection forms. This form is only accessible to administrators and technicians.', 'arm-repair-estimates'));
         }
 
         $template_id = isset($_POST['template_id']) ? (int) $_POST['template_id'] : 0;

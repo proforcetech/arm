@@ -12,6 +12,38 @@ class PublicView
 
     public static function render_shortcode($atts = []): string
     {
+        // Check if user is logged in
+        if (!is_user_logged_in()) {
+            $login_url = wp_login_url(get_permalink());
+            return '<div class="arm-inspection-form arm-notice arm-info" style="border:1px solid #2271b1; padding:12px; margin-bottom:16px; background:#f0f6fc;">' .
+                   sprintf(
+                       __('Please <a href="%s">log in</a> to access the inspection form.', 'arm-repair-estimates'),
+                       esc_url($login_url)
+                   ) .
+                   '</div>';
+        }
+
+        // Check if user has required role (admin or technician)
+        $current_user = wp_get_current_user();
+        $has_permission = false;
+
+        // Admins always have access
+        if (user_can($current_user, 'manage_options')) {
+            $has_permission = true;
+        } else {
+            // Check for technician roles
+            $roles = (array) $current_user->roles;
+            if (in_array('arm_technician', $roles, true) || in_array('technician', $roles, true)) {
+                $has_permission = true;
+            }
+        }
+
+        if (!$has_permission) {
+            return '<div class="arm-inspection-form arm-notice arm-error" style="border:1px solid #d63638; padding:12px; margin-bottom:16px; background:#fcf0f1;">' .
+                   esc_html__('You do not have permission to access the inspection form. This form is only accessible to administrators and technicians.', 'arm-repair-estimates') .
+                   '</div>';
+        }
+
         $atts = shortcode_atts([
             'template' => '',
         ], $atts, 'arm_re_inspection_form');
