@@ -27,6 +27,7 @@ class Installer {
 			available_credit DECIMAL(10,2) NOT NULL DEFAULT 0.00,
 			status VARCHAR(20) NOT NULL DEFAULT 'active',
 			notes TEXT,
+			payment_term_type VARCHAR(20) NOT NULL DEFAULT 'net_terms' COMMENT 'net_terms|same_as_cash|revolving',
 			payment_terms INT UNSIGNED DEFAULT 30 COMMENT 'Net payment terms in days',
 			last_payment_date DATETIME DEFAULT NULL,
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

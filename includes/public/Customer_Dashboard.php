@@ -230,6 +230,16 @@ class Customer_Dashboard {
             )
         );
 
+        // Get payment summary
+        $payment_summary = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT COUNT(*) as total_payments, COALESCE(SUM(amount), 0) as total_paid
+                FROM {$wpdb->prefix}arm_credit_payments
+                WHERE account_id = %d AND status = 'completed'",
+                $account->id
+            )
+        );
+
         // Include the credit account template
         include ARM_RE_PLUGIN_DIR . 'templates/customer/credit-account.php';
     }
