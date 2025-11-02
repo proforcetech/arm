@@ -7,6 +7,7 @@ if (!defined('ABSPATH')) exit;
 
 define('ARM_RE_VERSION', '1.2.0');
 define('ARM_RE_PATH', plugin_dir_path(__FILE__));
+define('ARM_RE_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('ARM_RE_URL',  plugin_dir_url(__FILE__));
 
 require_once ARM_RE_PATH.'includes/bootstrap.php';
@@ -73,4 +74,7 @@ add_action('plugins_loaded', function () {
     ARM\Reminders\Scheduler::boot();
     ARM\Inspections\Reports::boot();
     ARM\Inspections\PublicView::boot();
+
+    ARM\Credit\Controller::boot();
+    ARM\Credit\Frontend::boot();
 });

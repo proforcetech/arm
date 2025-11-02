@@ -270,6 +270,9 @@ final class Activator {
             \ARM\Links\Shortlinks::add_rewrite_rules();
             flush_rewrite_rules();
         }
+        if (class_exists('\\ARM\\Credit\\Installer')) {
+            \ARM\Credit\Installer::install_tables();
+        }
 
         if (defined('ARM_RE_VERSION')) {
             update_option('arm_re_version', ARM_RE_VERSION);
@@ -378,7 +381,7 @@ final class Activator {
     }
 
     private static function require_modules() {
-        
+
         $map = [
             '\\ARM\\Appointments\\Installer' => 'includes/appointments/Installer.php',
             '\\ARM\\Estimates\\Controller' => 'includes/estimates/Controller.php',
@@ -391,6 +394,7 @@ final class Activator {
             '\\ARM\\Integrations\\Payments_PayPal'    => 'includes/integrations/Payments_PayPal.php',
             '\\ARM\\Links\\Shortlinks'      => 'includes/links/class-shortlinks.php',
             '\\ARM\\Inspections\\Installer'    => 'includes/inspections/Installer.php',
+            '\\ARM\\Credit\\Installer'    => 'includes/credit/Installer.php',
         ];
         foreach ($map as $class => $rel) {
             if (!class_exists($class) && file_exists(ARM_RE_PATH . $rel)) {
