@@ -73,6 +73,7 @@ class Customer_Dashboard {
                 <button data-tab="vehicles" class="active"><?php esc_html_e('My Vehicles', 'arm-repair-estimates'); ?></button>
                 <button data-tab="estimates"><?php esc_html_e('Estimates', 'arm-repair-estimates'); ?></button>
                 <button data-tab="invoices"><?php esc_html_e('Invoices', 'arm-repair-estimates'); ?></button>
+                <button data-tab="credit"><?php esc_html_e('Credit Account', 'arm-repair-estimates'); ?></button>
                 <button data-tab="profile"><?php esc_html_e('Profile', 'arm-repair-estimates'); ?></button>
             </nav>
 
@@ -84,6 +85,9 @@ class Customer_Dashboard {
             </section>
             <section id="tab-invoices" class="arm-tab">
                 <?php self::render_invoices($customer); ?>
+            </section>
+            <section id="tab-credit" class="arm-tab">
+                <?php self::render_credit($customer); ?>
             </section>
             <section id="tab-profile" class="arm-tab">
                 <?php self::render_profile($user, $customer); ?>
@@ -194,6 +198,40 @@ class Customer_Dashboard {
         <?php else : ?>
             <p><?php esc_html_e('No invoices available.', 'arm-repair-estimates'); ?></p>
         <?php endif;
+    }
+
+    private static function render_credit(object $customer): void {
+        global $wpdb;
+
+        // Get credit account
+        $account = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT * FROM {$wpdb->prefix}arm_credit_accounts WHERE customer_id = %d",
+                $customer->id
+            )
+        );
+
+        if (!$account) {
+            ?>
+            <h3><?php esc_html_e('Credit Account', 'arm-repair-estimates'); ?></h3>
+            <p><?php esc_html_e('You do not have a credit account. Please contact us to set up credit terms.', 'arm-repair-estimates'); ?></p>
+            <?php
+            return;
+        }
+
+        // Get recent transactions
+        $transactions = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT * FROM {$wpdb->prefix}arm_credit_transactions
+                WHERE account_id = %d
+                ORDER BY transaction_date DESC
+                LIMIT 20",
+                $account->id
+            )
+        );
+
+        // Include the credit account template
+        include ARM_RE_PLUGIN_DIR . 'templates/customer/credit-account.php';
     }
 
     private static function render_profile(WP_User $user, object $customer): void {
