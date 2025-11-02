@@ -175,24 +175,26 @@ class Controller {
 
 		global $wpdb;
 
-		$id              = isset( $_POST['account_id'] ) ? intval( $_POST['account_id'] ) : 0;
-		$customer_id     = intval( $_POST['customer_id'] );
-		$credit_limit    = floatval( $_POST['credit_limit'] );
-		$current_balance = isset( $_POST['current_balance'] ) ? floatval( $_POST['current_balance'] ) : 0.00;
-		$status          = sanitize_text_field( $_POST['status'] );
-		$payment_terms   = intval( $_POST['payment_terms'] );
-		$notes           = sanitize_textarea_field( $_POST['notes'] );
+		$id               = isset( $_POST['account_id'] ) ? intval( $_POST['account_id'] ) : 0;
+		$customer_id      = intval( $_POST['customer_id'] );
+		$credit_limit     = floatval( $_POST['credit_limit'] );
+		$current_balance  = isset( $_POST['current_balance'] ) ? floatval( $_POST['current_balance'] ) : 0.00;
+		$status           = sanitize_text_field( $_POST['status'] );
+		$payment_term_type = isset( $_POST['payment_term_type'] ) ? sanitize_text_field( $_POST['payment_term_type'] ) : 'net_terms';
+		$payment_terms    = intval( $_POST['payment_terms'] );
+		$notes            = sanitize_textarea_field( $_POST['notes'] );
 
 		$available_credit = $credit_limit - $current_balance;
 
 		$data = array(
-			'customer_id'      => $customer_id,
-			'credit_limit'     => $credit_limit,
-			'current_balance'  => $current_balance,
-			'available_credit' => $available_credit,
-			'status'           => $status,
-			'payment_terms'    => $payment_terms,
-			'notes'            => $notes,
+			'customer_id'       => $customer_id,
+			'credit_limit'      => $credit_limit,
+			'current_balance'   => $current_balance,
+			'available_credit'  => $available_credit,
+			'status'            => $status,
+			'payment_term_type' => $payment_term_type,
+			'payment_terms'     => $payment_terms,
+			'notes'             => $notes,
 		);
 
 		if ( $id ) {
@@ -201,7 +203,7 @@ class Controller {
 				$wpdb->prefix . 'arm_credit_accounts',
 				$data,
 				array( 'id' => $id ),
-				array( '%d', '%f', '%f', '%f', '%s', '%d', '%s' ),
+				array( '%d', '%f', '%f', '%f', '%s', '%s', '%d', '%s' ),
 				array( '%d' )
 			);
 		} else {
@@ -209,7 +211,7 @@ class Controller {
 			$wpdb->insert(
 				$wpdb->prefix . 'arm_credit_accounts',
 				$data,
-				array( '%d', '%f', '%f', '%f', '%s', '%d', '%s' )
+				array( '%d', '%f', '%f', '%f', '%s', '%s', '%d', '%s' )
 			);
 			$id = $wpdb->insert_id;
 		}

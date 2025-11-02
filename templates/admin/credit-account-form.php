@@ -74,13 +74,33 @@ $is_edit = ! empty( $account );
 
 			<tr>
 				<th scope="row">
+					<label for="payment_term_type"><?php esc_html_e( 'Term Type', 'arm-repair-estimates' ); ?></label>
+				</th>
+				<td>
+					<select name="payment_term_type" id="payment_term_type" class="regular-text">
+						<option value="net_terms" <?php selected( $is_edit ? $account->payment_term_type : 'net_terms', 'net_terms' ); ?>>
+							<?php esc_html_e( 'Net Terms', 'arm-repair-estimates' ); ?>
+						</option>
+						<option value="same_as_cash" <?php selected( $is_edit && isset( $account->payment_term_type ) ? $account->payment_term_type : '', 'same_as_cash' ); ?>>
+							<?php esc_html_e( 'Same-as-Cash', 'arm-repair-estimates' ); ?>
+						</option>
+						<option value="revolving" <?php selected( $is_edit && isset( $account->payment_term_type ) ? $account->payment_term_type : '', 'revolving' ); ?>>
+							<?php esc_html_e( 'Revolving', 'arm-repair-estimates' ); ?>
+						</option>
+					</select>
+					<p class="description"><?php esc_html_e( 'Type of credit terms for this account.', 'arm-repair-estimates' ); ?></p>
+				</td>
+			</tr>
+
+			<tr id="payment_terms_row">
+				<th scope="row">
 					<label for="payment_terms"><?php esc_html_e( 'Payment Terms (Days)', 'arm-repair-estimates' ); ?></label>
 				</th>
 				<td>
 					<input type="number" name="payment_terms" id="payment_terms" min="0"
 						value="<?php echo $is_edit ? esc_attr( $account->payment_terms ) : '30'; ?>"
 						class="regular-text" />
-					<p class="description"><?php esc_html_e( 'Net payment terms in days (e.g., Net 30).', 'arm-repair-estimates' ); ?></p>
+					<p class="description"><?php esc_html_e( 'Net payment terms in days (e.g., Net 30). Used for Net Terms and Same-as-Cash.', 'arm-repair-estimates' ); ?></p>
 				</td>
 			</tr>
 
@@ -131,3 +151,23 @@ $is_edit = ! empty( $account );
 	color: #d63638;
 }
 </style>
+
+<script>
+jQuery(document).ready(function($) {
+	// Show/hide payment terms field based on term type
+	function togglePaymentTermsField() {
+		var termType = $('#payment_term_type').val();
+		if (termType === 'revolving') {
+			$('#payment_terms_row').hide();
+		} else {
+			$('#payment_terms_row').show();
+		}
+	}
+
+	// Initial state
+	togglePaymentTermsField();
+
+	// On change
+	$('#payment_term_type').on('change', togglePaymentTermsField);
+});
+</script>

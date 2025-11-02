@@ -41,7 +41,23 @@ defined( 'ABSPATH' ) || exit;
 			</tr>
 			<tr>
 				<td><strong><?php esc_html_e( 'Payment Terms:', 'arm-repair-estimates' ); ?></strong></td>
-				<td><?php echo esc_html( sprintf( __( 'Net %d days', 'arm-repair-estimates' ), $account->payment_terms ) ); ?></td>
+				<td>
+					<?php
+					$term_type = isset( $account->payment_term_type ) ? $account->payment_term_type : 'net_terms';
+					switch ( $term_type ) {
+						case 'same_as_cash':
+							echo esc_html( sprintf( __( 'Same-as-Cash (%d days)', 'arm-repair-estimates' ), $account->payment_terms ) );
+							break;
+						case 'revolving':
+							echo esc_html__( 'Revolving', 'arm-repair-estimates' );
+							break;
+						case 'net_terms':
+						default:
+							echo esc_html( sprintf( __( 'Net %d days', 'arm-repair-estimates' ), $account->payment_terms ) );
+							break;
+					}
+					?>
+				</td>
 			</tr>
 			<tr>
 				<td><strong><?php esc_html_e( 'Last Payment:', 'arm-repair-estimates' ); ?></strong></td>
